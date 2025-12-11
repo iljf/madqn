@@ -1,5 +1,4 @@
 from magent2_backup.environments import hetero_adversarial_v1
-# from magent2_backup.environments import tiger_deer_v4
 from MADQN import MADQN
 
 import numpy as np
@@ -17,7 +16,7 @@ def get_args():
     parser.add_argument('--eps', type=float, default=1)
     parser.add_argument('--eps_decay', type=float, default=0.9999)
     parser.add_argument('--eps_min', type=float, default=0.01)
-    parser.add_argument('--max_update_steps', type=int, default=4)
+    parser.add_argument('--max_update_steps', type=int, default=50)
     parser.add_argument('--total_ep', type=int, default=10000)
     parser.add_argument('--book_decay', type=float, default=0.1)
     parser.add_argument("--book_term", type=int, default=4)
@@ -33,8 +32,8 @@ def get_args():
     parser.add_argument('--target_update', type=int, default=10)
 
     parser.add_argument('--map_size', type=int, default=24)
-    parser.add_argument('--predator1_view_range', type=int, default=12)
-    parser.add_argument('--predator2_view_range', type=int, default=6)
+    parser.add_argument('--predator1_view_range', type=int, default=10)
+    parser.add_argument('--predator2_view_range', type=int, default=5)
     parser.add_argument('--n_predator1', type=int, default=2)
     parser.add_argument('--n_predator2', type=int, default=2)
     parser.add_argument('--n_prey', type=int, default=3)
@@ -47,8 +46,8 @@ def get_args():
     return parser.parse_args()
 
 args = get_args()
-wandb.init(project="MADQN_jws", entity='hails',config=args.__dict__)
-wandb.run.name = 'mapsize32_view80_40'
+wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
+wandb.run.name = 'log_test'
 
 
 device = 'cpu'
@@ -131,6 +130,9 @@ def main():
     env = hetero_adversarial_v1.env(map_size=args.map_size, minimap_mode=False, tag_penalty=args.tag_penalty,
                                     max_cycles=args.max_update_steps, extra_features=False, render_mode=render_mode)
 
+
+    step_idx_ep = 0
+
     for ep in range(args.total_ep):
 
         # shared book reset every episode
@@ -147,7 +149,7 @@ def main():
         ep_reward_pred1 = 0
         ep_reward_pred2 = 0
 
-        iteration_number = 0
+        n_iteration = 0
 
         observations_dict = {}
         for agent_idx in range(n_predator1 + n_predator2):
@@ -191,25 +193,28 @@ def main():
 
         for agent in env.agent_iter():
 
-            step_idx = iteration_number // (args.n_predator1 + args.n_predator2 + args.n_prey)
+            n_agents = (args.n_predator1 + args.n_predator2 + args.n_prey)
+            step_idx_ep = n_iteration // n_agents
 
 
-            if (((iteration_number) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0) and (step_idx > 0):
+            if (((n_iteration) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0) and (n_agents > 0):
 
                 ##########################################################################################
                 ########### ? ??? ??? ??? step ?  ?? ??? shared graph ? ???? ???? ??##########
                 ##########################################################################################
                 ##??## max_update_steps ? ???  env.last()? ? step ? ??? truncation=TRUE ? ?? ?? ????? ??? ??? ??!!
 
-                if step_idx > 0:
+
+
+                if step_idx_ep > 0:
 
                     madqn.shared_decay() # ? step ? ??? decaying ? ???.
 
                     # ??? ??? ????, truncation ?? ?? ??? ??? ?????, ??? step? ?? ?? ???? shared_book? ???? ??? ?? ??.
-                    if step_idx != args.max_update_steps:
+                    if step_idx_ep != args.max_update_steps:
 
                         # ??? ?? ????? share_book ? decaying??? ??? ??? ??.
-                        if step_idx <= args.book_term:
+                        if step_idx_ep <= args.book_term:
 
                             # ?? ?????? ??? ??? ??
                             for idx in range(n_predator1 + n_predator2):
@@ -333,7 +338,7 @@ def main():
 
 
 
-                    if step_idx > 1:
+                    if step_idx_ep > 1:
 
                         ##########################################################################################
                         ############ ? ?? ??? ??? ??? step ?  ?? ??? buffer ? ???? ???? ??###########
@@ -409,41 +414,27 @@ def main():
 
 
 
-
-                        #########################################################################
-                        ################################wandb ??################################
-                        #########################################################################
-                        # ? step ? ???, ? step?? ??? ? ???? wandb ? ???? ??!
-
-                        ############################################
-                        #####################??####################
-                        ############################################
+                        wandb.log({"steps/total_step_reward": step_rewards,
+                                   "predator1/step_reward": step_rewards_pred1,
+                                   "predator2/step_reward": step_rewards_pred2,
+                                   "step": step_idx_ep,
+                                   })
 
 
-                        wandb.log({"Total Step Reward": step_rewards,
-                                   "Team1 Step Reward": step_rewards_pred1,
-                                   "Team2 Step Reward": step_rewards_pred2})
+                        wandb.log({"predator1/move_count": madqn.step_move_count_pred[0],
+                                   "predator2/moved_count": madqn.step_move_count_pred[1],
+                                   "predator1/tag_count": madqn.step_tag_count_pred[0],
+                                   "predator2/tag_count": madqn.step_tag_count_pred[1],
+                                   "step": step_idx_ep,
+                                   })
 
+                        wandb.log({"predator1/avg_tag_count": madqn.avg_tag_deque_pred1[-1],
+                                   "predator2/avg_tag_count": madqn.avg_tag_deque_pred2[-1],
+                                   "predator1/avg_move_count": madqn.avg_move_deque_pred1[-1],
+                                   "predator2/avg_move_count": madqn.avg_move_deque_pred2[-1],
+                                   "step": step_idx_ep,
+                                   })
 
-                        wandb.log({"Team 1 move count": madqn.step_move_count_pred[0],
-                                   "Team 2 move count": madqn.step_move_count_pred[1],
-                                   "Team 1 tag count": madqn.step_tag_count_pred[0],
-                                   "Team 2 tag count": madqn.step_tag_count_pred[1]})
-
-                        wandb.log({"Team 1 avg tag count": madqn.avg_tag_deque_pred1[-1],
-                                   "Team 2 avg tag count": madqn.avg_tag_deque_pred2[-1],
-                                   "Team 1 avg move count": madqn.avg_move_deque_pred1[-1],
-                                   "Team 2 avg move count": madqn.avg_move_deque_pred2[-1]})
-
-                        # wandb.log({"Team 1 move count": madqn.step_move_count_pred[0][-1],
-                        #            "Team 2 move count": madqn.step_move_count_pred[1][-1],
-                        #            "Team 1 tag count": madqn.step_tag_count_pred[0][-1],
-                        #            "Team 2 tag count": madqn.step_tag_count_pred[1][-1]})
-                        #
-                        # wandb.log({"Team 1 avg tag count": madqn.avg_tag_deque_pred1[-1],
-                        #            "Team 2 avg tag count": madqn.avg_tag_deque_pred2[-1],
-                        #            "Team 1 avg move count": madqn.avg_move_deque_pred1[-1],
-                        #            "Team 2 avg move count": madqn.avg_move_deque_pred2[-1]})
 
 
 
@@ -465,37 +456,91 @@ def main():
                             if len(value) == 0:
                                 continue
                             last_value = value[-1]
-                            wandb.log({f"Overlap Tile Ratio with Team 1_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1: # predator1 agents with predator1
+                                wandb.log(
+                                    {f"predator1/Overlap_ratio_predator1_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1 # predator2 agents with predator1
+                                wandb.log(
+                                    {f"predator2/Overlap_ratio_predator1_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # ? ????? ?? Observation ?? ?? predator2? ??? ??
                         for idx, value in madqn.agent_graph_overlap_pred2_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log({f"Overlap Tile Ratio with Team 2_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1: # predator1 agents with predator2
+                                wandb.log(
+                                    {f"predator1/Overlap_ratio_predator2_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1 # predator2 agents with predator2
+                                wandb.log(
+                                    {f"predator2/Overlap_ratio_predator2_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # team1? view? ??? ??? intake? ??? ????? ????? ??
                         for idx, value in madqn.intake_sum_with_pred1_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log({f"summed intake Difference with Team1_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1: # predator1 agents with predator1
+                                wandb.log(
+                                    {f"predator1/Sum_intake_diff_predator1_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1 # predator2 agents with predator1
+                                wandb.log(
+                                    {f"predator2/Sum_intake_diff_predator1_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # team2? view? ??? ??? intake? ??? ????? ????? ??
                         for idx, value in madqn.intake_sum_with_pred2_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log({f"summed intake Difference with Team2_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1: # predator1 agents with predator2
+                                wandb.log(
+                                    {f"predator1/Sum_intake_diff_predator2_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1 # predator2 agents with predator2
+                                wandb.log(
+                                    {f"predator2/Sum_intake_diff_predator2_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # team1? view? ??? ??? intake? ??? ????? ??? ???? ??
                         for idx, value in madqn.intake_inner_with_pred1_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log({f"inner product intake Difference with Team1_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1: # predator1 agents with predator1
+                                wandb.log(
+                                    {f"predator1/inner_intake_diff_predator1_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1 # predator2 agents with predator1
+                                wandb.log(
+                                    {f"predator2/inner_intake_diff_predator1_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # team2? view? ??? ??? intake? ??? ????? ??? ???? ??
                         for idx, value in madqn.intake_inner_with_pred2_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log({f"inner product intake Difference with Team2_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1: # predator1 agents with predator2
+                                wandb.log(
+                                    {f"predator1/inner_intake_diff_predator2_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1 # predator2 agents with predator2
+                                wandb.log(
+                                    {f"predator2/inner_intake_diff_predator2_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # # ??? observation ? GNN ? ?? ???? ?? observation ? L2 ?
                         # for idx, value in enumerate(madqn.l2_before_outtake_deque_dict):
@@ -508,22 +553,49 @@ def main():
                         for idx, value in madqn.l2_outtake_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log(
-                                {f"Total outtake_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1:
+                                wandb.log(
+                                    {f"predator1/total_outtake_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1
+                                wandb.log(
+                                    {f"predator2/total_outtake_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # ?? ?? ??? view ? ???? ?? ?? intake ??? ???
                         for idx, value in madqn.l2_intake_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log(
-                                {f"Total Intake_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1:
+                                wandb.log(
+                                    {f"predator1/total_intake_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1
+                                wandb.log(
+                                    {f"predator2/total_intake_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
+
 
                         # ?  ????? action
                         for idx, dq in madqn.agent_action_deque_dict.items():
                             if len(dq) == 0:
                                 continue
                             last_value = dq[-1]
-                            wandb.log({f"Action_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1:
+                                wandb.log(
+                                    {f"predator1/action_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1
+                                wandb.log(
+                                    {f"predator2/action_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
+
 
                         #########################
                         #######Y?? ?? ??######
@@ -534,38 +606,78 @@ def main():
                         for idx, value in madqn.tiles_number_with_pred1_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log( {f"Number of Overlapping Tiles with Team1_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1:
+                                wandb.log(
+                                    {f"predator1/n_overlapping_tiles_predator1_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1
+                                wandb.log(
+                                    {f"predator2/n_overlapping_tiles_predator1_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
+
 
                         # team2 ? ??? ?? ?
                         for idx, value in madqn.tiles_number_with_pred2_deque_dict.items():
                         # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log({f"Number of Overlapping Tiles with Team2_{idx}": last_value, "step": iteration_number})
+
+                        if idx < n_predator1:
+                            wandb.log(
+                                {f"predator1/n_overlapping_tiles_predator2_P1_{idx}": last_value, "step": step_idx_ep}
+                            )
+                        else:
+                            pred2_idx = idx - n_predator1
+                            wandb.log(
+                                {f"predator2/n_overlapping_tiles_predator2_P2_{pred2_idx}": last_value,
+                                 "step": step_idx_ep}
+                            )
 
                         # prey??? ?? ??
                         for idx, value in madqn.agent_avg_dist_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log(
-                                {f"Average Distance to Prey_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1:
+                                wandb.log(
+                                    {f"predator1/avg_distance_prey_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1
+                                wandb.log(
+                                    {f"predator2/avg_distance_prey_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # prey??? ?? ??
                         for idx, value in madqn.agent_min_dist_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log(
-                                {f"Shortest Distance to Prey_{idx}": last_value, "step": iteration_number})
+
+                            if idx < n_predator1:
+                                wandb.log(
+                                    {f"predator1/shortest_distance_prey_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1
+                                wandb.log(
+                                    {f"predator2/shortest_distance_prey_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
                         # ?  ???? ?? ???? prey ?
                         for idx, value in madqn.prey_number_deque_dict.items():
                             # ? deque? ??? ?? ??
                             last_value = value[-1]
-                            wandb.log(
-                                {f"Prey Count in Own Observation_{idx}": last_value, "step": iteration_number})
 
-
-
-
+                            if idx < n_predator1:
+                                wandb.log(
+                                    {f"predator1/n_prey_observation_P1_{idx}": last_value, "step": step_idx_ep}
+                                )
+                            else:
+                                pred2_idx = idx - n_predator1
+                                wandb.log(
+                                    {f"predator2/n_prey_observation_P2_{pred2_idx}": last_value, "step": step_idx_ep}
+                                )
 
             if agent[:8] == "predator":
 
@@ -619,8 +731,7 @@ def main():
                 if termination or truncation:
                     print(agent, 'is terminated')
                     env.step(None)
-                    # truncation ?? ???? iteration_number? ??? ???? ??.
-                    iteration_number += 1
+                    n_iteration += 1
                     continue
 
                 else:
@@ -717,29 +828,29 @@ def main():
                 if termination or truncation:
                     print(agent, 'is terminated')
                     env.step(None)
-                    iteration_number += 1
+                    n_iteration += 1
                     continue
 
                 else:
                     action = env.action_space(agent).sample()
                     env.step(action)
 
-            iteration_number += 1
+            n_iteration += 1
 
             #  intake case1 ????? ? ??
             #  "? ????? ?? observation? ??"? "1step ??? ?? ?????? observation? ??? ??" ? ??? ???? ??
             # ?? ???? ? ???..!
-            if (((iteration_number) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0):
+            if (((n_iteration) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0):
 
                 # ??? ????? shared graph ? ??? ?? ??? ??? ??? 0??? ? ? ??.
-                if step_idx == 1:
+                if step_idx_ep == 1:
                     for idx in range(n_predator1 + n_predator2):
                         madqn.intake_overlap_with_pred1[idx].append(0)
                         madqn.intake_overlap_with_pred2[idx].append(0)
 
 
                 # ???  ????? ??? ??? ?? ??? ??? ???? ??.
-                elif step_idx != args.max_update_steps:
+                elif step_idx_ep != args.max_update_steps:
                     past = entire_pos[-2]  # ?? ????? ? step ??? ????
                     now = entire_pos[-1]  # ?? ????? ?? ????
 
@@ -757,23 +868,27 @@ def main():
                 else:
                     pass
 
+            step_idx_ep += 1
+
 
         if madqn.buffer.size() >= args.trainstart_buffersize:
             pred1_move = max(madqn.ep_move_count_pred[0], 1) # block Zerodivision
             pred2_move = max(madqn.ep_move_count_pred[1], 1)
-            wandb.log({"ep_reward": ep_reward,
-                       "ep_reward_pred1": ep_reward_pred1,
-                       "ep_reward_pred2": ep_reward_pred2,
-                       "ep_move_pred1": madqn.ep_move_count_pred[0],
-                       "ep_move_pred2": madqn.ep_move_count_pred[1],
-                       "(ep_reward_pred1)/(ep_move_move_pred1)": ep_reward_pred1 / pred1_move,
-                       "(ep_reward_pred2)/(ep_move_move_pred2)": ep_reward_pred2 / pred2_move,
+            wandb.log({"episode/episode": ep,
+                       "episode/total_reward": ep_reward,
+                       "episode/predator1_reward": ep_reward_pred1,
+                       "episode/predator2_reward": ep_reward_pred2,
+                       "episode/predator1_move_count": madqn.ep_move_count_pred[0],
+                       "episode/predator2_move_count": madqn.ep_move_count_pred[1],
+                       "episode/predator1_reward_over_move": ep_reward_pred1 / pred1_move,
+                       "episode/predator2_reward_over_move": ep_reward_pred2 / pred2_move,
+                       "step": step_idx_ep,
                        })
 
-        if ep > args.total_ep:  # 100
+        if ep > args.total_ep:  # 30
 
             print('*' * 10, 'train over', '*' * 10)
-            print(iteration_number)
+            print(n_iteration)
             break
 
         if (madqn.buffer.size() >= args.trainstart_buffersize) and (ep % args.target_update == 0):
@@ -796,10 +911,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-    # for i in range(len(madqn.gdqns)) :
-    #     th.save(madqn.gdqns[i].state_dict(), 'model_save/'+'model_'+ str(i) +'.pt')
-    #     th.save(madqn.gdqns[i].state_dict(), 'model_save/' + 'model_target_' + str(i) + '.pt')
 
     print('done')
 
