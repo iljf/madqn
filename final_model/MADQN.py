@@ -58,7 +58,7 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         ######related to plotting#####
         ##############################
 
-        # action related
+        # action related TODO: check reset. move count comming out as 0
         self.ep_move_count_pred = {
             0: 0,
             1: 0
