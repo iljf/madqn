@@ -739,8 +739,8 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
             torch.tensor(state).to(self.device), self.adj.to(self.device), book.to(self.device))
 
         if not hasattr(self, "_debug_printed"):
-            print("state shape:", getattr(state, "shape", None))
-            print("adj shape:", self.adj.shape)
+            # print("state shape:", getattr(state, "shape", None))
+            # print("adj shape:", self.adj.shape)
             self._debug_printed = True
 
         if isinstance(state, np.ndarray):
@@ -752,7 +752,7 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         self.epsilon = max(self.epsilon, self.eps_min)
 
         if np.random.random() < self.epsilon:
-            print('random')
+            # print('random')
             # return random.randint(0, self.dim_act - 1), book
             return random.randint(0, self.dim_act-1), book, shared_info, l2_before,  l2_outtake, shared_sum, l2_intake ,after_gnn
 
@@ -767,6 +767,9 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
     def replay(self):
         for _ in range(self.replay_times):
+            with torch.no_grad():
+                pre_param_1 = next(self.gdqn.gnn1.parameters())
+                pre_weight = pre_param_1.detach().cpu().clone()
 
             self.gdqn_optimizer.zero_grad()
 
@@ -796,6 +799,16 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
             self.gdqn_optimizer.step()
 
+            with torch.no_grad():
+                post_param_1 = next(self.gdqn.gnn1.parameters())
+                post_weight = post_param_1.detach().cpu()
+
+                diff = (post_weight - pre_weight).abs().max().item()
+                pre_norm = pre_weight.norm().item()
+                post_norm = post_weight.norm().item()
+
+                ### debug code for agent training
+                # print(f"[Debug][agent{self.idx}] gnn1 param diff: {diff:.6e}  |" f"pre norm: {pre_norm:.4f} / post: {post_norm:.4f}")
 
             try:
                 torch.cuda.empty_cache()
