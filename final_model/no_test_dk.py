@@ -16,15 +16,15 @@ def get_args():
     parser.add_argument('--eps', type=float, default=1)
     parser.add_argument('--eps_decay', type=float, default=0.9999)
     parser.add_argument('--eps_min', type=float, default=0.01)
-    parser.add_argument('--max_update_steps', type=int, default=50)
-    parser.add_argument('--total_ep', type=int, default=10000)
+    parser.add_argument('--max_update_steps', type=int, default=3000) # TODO: increase steps
+    parser.add_argument('--total_ep', type=int, default=100)
     parser.add_argument('--book_decay', type=float, default=0.1)
     parser.add_argument("--book_term", type=int, default=4)
     parser.add_argument('--ep_save', type=int, default=1000)
     parser.add_argument('--jitter_std', type=float, default=0.5)
 
-    parser.add_argument('--buffer_size', type=int, default=10000)
-    parser.add_argument('--trainstart_buffersize', type=int, default=5000)
+    parser.add_argument('--buffer_size', type=int, default=300000) # TODO: is this step? check , decay check. step + episode numb.
+    parser.add_argument('--trainstart_buffersize', type=int, default=3000)
     parser.add_argument('--deque_len', type=int, default=400)
     parser.add_argument('--plot_term', type=int, default=10)
 
@@ -47,7 +47,7 @@ def get_args():
 
 args = get_args()
 wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
-wandb.run.name = 'log_test'
+wandb.run.name = 'bs3e5_step3000'
 
 
 device = 'cpu'
@@ -199,39 +199,25 @@ def main():
 
             if (((n_iteration) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0) and (n_agents > 0):
 
-                ##########################################################################################
-                ########### ? ??? ??? ??? step ?  ?? ??? shared graph ? ???? ???? ??##########
-                ##########################################################################################
-                ##??## max_update_steps ? ???  env.last()? ? step ? ??? truncation=TRUE ? ?? ?? ????? ??? ??? ??!!
-
-
-
                 if step_idx_ep > 0:
-
                     madqn.shared_decay() # ? step ? ??? decaying ? ???.
 
-                    # ??? ??? ????, truncation ?? ?? ??? ??? ?????, ??? step? ?? ?? ???? shared_book? ???? ??? ?? ??.
-                    if step_idx_ep != args.max_update_steps:
+                    if step_idx_ep != args.max_update_steps: # shared_book update
 
-                        # ??? ?? ????? share_book ? decaying??? ??? ??? ??.
                         if step_idx_ep <= args.book_term:
 
-                            # ?? ?????? ??? ??? ??
                             for idx in range(n_predator1 + n_predator2):
 
-                                # ?? ???? agent_pos? self.pos? ??
-                                madqn.set_agent_pos(agent_pos[idx][-1])
 
-                                # predator ??? ?? self.view_range ??
+                                madqn.set_agent_pos(agent_pos[idx][-1]) # agent position
+
                                 if idx < args.n_predator1:
                                     madqn.set_agent_shared(predator1_view_range)
                                 else:
                                     madqn.set_agent_shared(predator2_view_range)
 
-                                # ????? ?? ??? shared_info? ??
                                 madqn.to_guestbook(shared_info_dict[idx][-1].to('cpu'))
 
-                        # step_idx > args.book_term ??? ?? ??? ??? ?????? ?? ??? ????? ??.
                         else:
                             # erase last step book information
                             for idx in range(n_predator1 + n_predator2):
@@ -259,34 +245,27 @@ def main():
 
                                 madqn.to_guestbook(shared_info_dict[idx][-1].to('cpu'))
 
-                        ######################################################################
-                        ######################################################################
-                        ######### avg(dist(prey))-move plotting process for each team#########
-                        ######################################################################
-                        ######################################################################
-                        # ??? ??? ??(== truncation ?? ?? ???? ???? ??)
-                        # ?? ?? ???? ??? ???? ??? ? ???? ???? ??
 
-                        # madqn.summation_team_dist ??  step? ?? prey??? ???? ??? list
-                        # ???? -1? ??? reward/move count ?? move count = 0 ?? ??? ?? ??? ???? ??? ???? ?? ??? 1? ?????
-                        # ???????, ???? ?? ??? ??? ??? ?? ??? -1? ??? ???.
-
-                        # # ??? ?? ? step??? ? predator1 ? prey???? ??? avg(distance) ,min(distance) ? avg(count)??? ??? ??
                         madqn.avg_dist_append_pred1(check_zero_size_avg_pred1(madqn.summation_team_dist[0]))  # step
                         madqn.min_dist_append_pred1(check_zero_size_min_pred1(madqn.summation_team_dist[0]))  # step
                         madqn.avg_move_append_pred1((madqn.step_move_count_pred[0] - 1) / n_predator1)  # step
                         madqn.avg_tag_append_pred1((madqn.step_tag_count_pred[0]) / n_predator1)  # step
 
-                        # # ??? ?? ? step??? ? predator2 ? prey???? ??? avg(distance) ,min(distance) ? avg(count)??? ??? ??
                         madqn.avg_dist_append_pred2(check_zero_size_avg_pred2(madqn.summation_team_dist[1]))  # step
                         madqn.min_dist_append_pred2(check_zero_size_min_pred2(madqn.summation_team_dist[1]))  # step
                         madqn.avg_move_append_pred2((madqn.step_move_count_pred[1] - 1) / n_predator2)  # step
                         madqn.avg_tag_append_pred2((madqn.step_tag_count_pred[1]) / n_predator2)  # step
 
-                        # # ??? ??? ??????? ?? ??? ???? plotting ? ?? ??? ?? ??->?? ??
-                        madqn.reset_step_move_count()  # ????? ?? ????? ??.
-                        madqn.reset_step_tag_count()  # ????? ?? ????? ??.
-                        madqn.reset_summation_team_dist()  # ??? ????? ??.
+                        wandb.log({"predator1/move_count": madqn.step_move_count_pred[0],
+                                   "predator2/move_count": madqn.step_move_count_pred[1],
+                                   "predator1/tag_count": madqn.step_tag_count_pred[0],
+                                   "predator2/tag_count": madqn.step_tag_count_pred[1],
+                                   "step": step_idx_ep,
+                                   })
+
+                        madqn.reset_step_move_count()
+                        madqn.reset_step_tag_count()
+                        madqn.reset_summation_team_dist()
 
                         # out take? ??? plot(==case2)? ?? ?? ??? ??? ???? ??
                         pos_list = np.concatenate((pos_predator1, pos_predator2), axis=0)
@@ -302,11 +281,6 @@ def main():
                         for idx, value in enumerate(ratio_matrix[:, 1]):
                             madqn.agent_graph_overlap_pred2_deque_dict[idx].append(value)
 
-
-
-
-                    # ??? step? truncation == 1 ? ???? agent? ???? ????, ??? ???? ???? ??? ????.
-                    # ??? ??? ??? ??? ???? ??? ? ?? ??? ??.
                     else:
                         madqn.avg_dist_append_pred1(check_zero_size_avg_pred1(madqn.summation_team_dist[0]))
                         madqn.min_dist_append_pred1(check_zero_size_min_pred1(madqn.summation_team_dist[0]))
@@ -362,11 +336,9 @@ def main():
                         # ?? ????? total reward ?? -> ?????? ?? reward ? ???? ???? ???? ??
                         ##########################################################################
 
-                        # ?????? ?? reward ??
                         for agent_rewards in reward_dict.values():
                             step_rewards += np.sum(agent_rewards[-1])
 
-                        # ??? ??? ??
                         for penalty in move_penalty_dict.values():
                             step_penalty_rewards += np.sum(penalty[-2])
 
@@ -401,7 +373,7 @@ def main():
                         ep_reward_pred2 += step_rewards_pred2
 
                         for idx in range(n_predator1 + n_predator2):
-                            madqn.set_agent_buffer(idx)  # ? ????? ??? buffer ? ????? ??
+                            madqn.set_agent_buffer(idx)
 
                             madqn.buffer.put(observations_dict[idx][-2],
                                              book_dict[idx][-2],
@@ -412,21 +384,12 @@ def main():
                                              termination_dict[idx][-2],
                                              truncation_dict[idx][-2])
 
-
-
                         wandb.log({"steps/total_step_reward": step_rewards,
                                    "predator1/step_reward": step_rewards_pred1,
                                    "predator2/step_reward": step_rewards_pred2,
                                    "step": step_idx_ep,
                                    })
 
-
-                        wandb.log({"predator1/move_count": madqn.step_move_count_pred[0],
-                                   "predator2/moved_count": madqn.step_move_count_pred[1],
-                                   "predator1/tag_count": madqn.step_tag_count_pred[0],
-                                   "predator2/tag_count": madqn.step_tag_count_pred[1],
-                                   "step": step_idx_ep,
-                                   })
 
                         wandb.log({"predator1/avg_tag_count": madqn.avg_tag_deque_pred1[-1],
                                    "predator2/avg_tag_count": madqn.avg_tag_deque_pred2[-1],
