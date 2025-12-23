@@ -281,46 +281,37 @@ def main():
                         for idx, value in enumerate(ratio_matrix[:, 1]):
                             madqn.agent_graph_overlap_pred2_deque_dict[idx].append(value)
 
-                    else:
-                        madqn.avg_dist_append_pred1(check_zero_size_avg_pred1(madqn.summation_team_dist[0]))
-                        madqn.min_dist_append_pred1(check_zero_size_min_pred1(madqn.summation_team_dist[0]))
-                        madqn.avg_move_append_pred1((madqn.step_move_count_pred[0] - 1) / n_predator1)
-                        madqn.avg_tag_append_pred1((madqn.step_tag_count_pred[0]) / n_predator1)
-
-                        # ??? ?? predator2 ? avg(distance) ,min(distance) ? avg(count)??? ??? ??
-                        madqn.avg_dist_append_pred2(check_zero_size_avg_pred2(madqn.summation_team_dist[1]))
-                        madqn.min_dist_append_pred2(check_zero_size_min_pred2(madqn.summation_team_dist[1]))
-                        madqn.avg_move_append_pred2((madqn.step_move_count_pred[1] - 1) / n_predator2)
-                        madqn.avg_tag_append_pred2((madqn.step_tag_count_pred[1]) / n_predator2)
-
-                        # ??? ??? ??????? ?? ??? ???? plotting ? ?? ??? ?? ??->?? ??
-                        madqn.reset_step_move_count()  # ????? ?? ????? ??.
-                        madqn.reset_step_tag_count()  # ????? ?? ????? ??.
-                        madqn.reset_summation_team_dist()  # ??? ????? ??.
-
-                        # out take case2 ????? ? ??
-                        # pos_predator1 ? pos_predator2 ? ?? ???? ?????, ??? ?? ?? ???, ???? ???? ????.
-                        pos_list = np.concatenate((pos_predator1, pos_predator2), axis=0)
-                        ratio_matrix = madqn.calculate_Overlap_ratio(pos_list)
-                        # ? ??? ??? ??.
-                        for idx, value in enumerate(ratio_matrix[:, 0]):
-                            madqn.agent_graph_overlap_pred1_deque_dict[idx].append(value)
-
-                        # a? ? ?? ?? ??? self.agent_graph_overlap_pred2_deque_dict? ??
-                        for idx, value in enumerate(ratio_matrix[:, 1]):
-                            madqn.agent_graph_overlap_pred2_deque_dict[idx].append(value)
-
-
+                    # else:
+                    #     madqn.avg_dist_append_pred1(check_zero_size_avg_pred1(madqn.summation_team_dist[0]))
+                    #     madqn.min_dist_append_pred1(check_zero_size_min_pred1(madqn.summation_team_dist[0]))
+                    #     madqn.avg_move_append_pred1((madqn.step_move_count_pred[0] - 1) / n_predator1)
+                    #     madqn.avg_tag_append_pred1((madqn.step_tag_count_pred[0]) / n_predator1)
+                    #
+                    #     # ??? ?? predator2 ? avg(distance) ,min(distance) ? avg(count)??? ??? ??
+                    #     madqn.avg_dist_append_pred2(check_zero_size_avg_pred2(madqn.summation_team_dist[1]))
+                    #     madqn.min_dist_append_pred2(check_zero_size_min_pred2(madqn.summation_team_dist[1]))
+                    #     madqn.avg_move_append_pred2((madqn.step_move_count_pred[1] - 1) / n_predator2)
+                    #     madqn.avg_tag_append_pred2((madqn.step_tag_count_pred[1]) / n_predator2)
+                    #
+                    #     # ??? ??? ??????? ?? ??? ???? plotting ? ?? ??? ?? ??->?? ??
+                    #     madqn.reset_step_move_count()  # ????? ?? ????? ??.
+                    #     madqn.reset_step_tag_count()  # ????? ?? ????? ??.
+                    #     madqn.reset_summation_team_dist()  # ??? ????? ??.
+                    #
+                    #     # out take case2 ????? ? ??
+                    #     # pos_predator1 ? pos_predator2 ? ?? ???? ?????, ??? ?? ?? ???, ???? ???? ????.
+                    #     pos_list = np.concatenate((pos_predator1, pos_predator2), axis=0)
+                    #     ratio_matrix = madqn.calculate_Overlap_ratio(pos_list)
+                    #     # ? ??? ??? ??.
+                    #     for idx, value in enumerate(ratio_matrix[:, 0]):
+                    #         madqn.agent_graph_overlap_pred1_deque_dict[idx].append(value)
+                    #
+                    #     # a? ? ?? ?? ??? self.agent_graph_overlap_pred2_deque_dict? ??
+                    #     for idx, value in enumerate(ratio_matrix[:, 1]):
+                    #         madqn.agent_graph_overlap_pred2_deque_dict[idx].append(value)
 
                     if step_idx_ep > 1:
 
-                        ##########################################################################################
-                        ############ ? ?? ??? ??? ??? step ?  ?? ??? buffer ? ???? ???? ??###########
-                        ##########################################################################################
-                        # put experience into the buffer after second step
-
-
-                        # ?? ????? ?? reward ??? ?? ??
                         step_rewards = 0
                         step_penalty_rewards = 0
 
