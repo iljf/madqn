@@ -735,8 +735,9 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
         book = self.from_guestbook()
 
-        q_value, shared_info, l2_before, l2_outtake, shared_sum, l2_intake, after_gnn, outtake_ratio = self.gdqn(
-            torch.tensor(state).to(self.device), self.adj.to(self.device), book.to(self.device))
+        with torch.no_grad():
+            q_value, shared_info, l2_before, l2_outtake, shared_sum, l2_intake, after_gnn, outtake_ratio = self.gdqn(
+                torch.tensor(state).to(self.device), self.adj.to(self.device), book.to(self.device))
 
         if not hasattr(self, "_debug_printed"):
             # print("state shape:", getattr(state, "shape", None))
@@ -751,13 +752,31 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         self.epsilon *= self.eps_decay
         self.epsilon = max(self.epsilon, self.eps_min)
 
+
+        # move returned tensors to CPU and detach to avoid keeping GPU references
+        try:
+            book_cpu = book.detach().cpu()
+        except Exception:
+            book_cpu = book
+
+        def to_cpu(x):
+            try:
+                return x.detach().cpu()
+            except Exception:
+                return x
+
+        shared_info_cpu = to_cpu(shared_info)
+        l2_before_cpu = to_cpu(l2_before)
+        l2_outtake_cpu = to_cpu(l2_outtake)
+        shared_sum_cpu = to_cpu(shared_sum)
+        l2_intake_cpu = to_cpu(l2_intake)
+        after_gnn_cpu = to_cpu(after_gnn)
+        outtake_ratio_cpu = to_cpu(outtake_ratio)
+
         if np.random.random() < self.epsilon:
-            # print('random')
-            # return random.randint(0, self.dim_act - 1), book
-            return random.randint(0, self.dim_act-1), book, shared_info, l2_before,  l2_outtake, shared_sum, l2_intake ,after_gnn
+            return random.randint(0, self.dim_act - 1), book_cpu, shared_info_cpu, l2_before_cpu, l2_outtake_cpu, shared_sum_cpu, l2_intake_cpu, after_gnn_cpu
 
-
-        return torch.argmax(q_value).item(), book, shared_info, l2_before, l2_outtake, shared_sum, l2_intake, after_gnn
+        return torch.argmax(q_value).item(), book_cpu, shared_info_cpu, l2_before_cpu, l2_outtake_cpu, shared_sum_cpu, l2_intake_cpu, after_gnn_cpu
 
         try:
             torch.cuda.empty_cache()

@@ -6,6 +6,7 @@ import torch as th
 import wandb
 
 from arguments import args
+import os
 
 
 device = 'cpu'
@@ -278,8 +279,13 @@ def main():
 
         if (ep % args.ep_save) ==0 :
             for i in range(len(madqn.gdqns)) :
-                th.save(madqn.gdqns[i].state_dict(), 'model_save/'+'model_'+ str(i) + '_ep' +str(ep) +'.pt')
-                th.save(madqn.gdqns[i].state_dict(), 'model_save/' + 'model_target_' + str(i) + '_ep' + str(ep)+ '.pt')
+                path = 'model_save/'+'model_'+ str(i) + '_ep' +str(ep) +'.pt'
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                th.save(madqn.gdqns[i].state_dict(), path)
+
+                path_t = 'model_save/' + 'model_target_' + str(i) + '_ep' + str(ep)+ '.pt'
+                os.makedirs(os.path.dirname(path_t), exist_ok=True)
+                th.save(madqn.gdqns[i].state_dict(), path_t)
 
     print('*' * 10, 'train over', '*' * 10)
 

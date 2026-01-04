@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from mix_net import QMIX_Net, VDN_Net
+import os
 
 
 # orthogonal initialization
@@ -231,4 +232,6 @@ class QMIX_SMAC(object):
         return inputs
 
     def save_model(self, env_name, algorithm, number, seed, total_steps):
+        dirpath = "./model/{}".format(env_name)
+        os.makedirs(dirpath, exist_ok=True)
         torch.save(self.eval_Q_net.state_dict(), "./model/{}/{}_eval_rnn_number_{}_seed_{}_step_{}k.pth".format(env_name, algorithm, number, seed, int(total_steps / 1000)))
