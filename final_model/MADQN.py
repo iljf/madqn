@@ -879,486 +879,486 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
 
     # 각 에이전트에 대한 append는 굳이 팀처럼 append 역할을 하는 함수를 따로 두지 않아도 된다.
-    # def avg_dist_append_agent(self, avg_dist):
-    #     self.agent_avg_dist_deque_dict[self.idx].append(avg_dist)
-
-    # def min_dist_append_agent(self, min_dist):
-    #     self.agent_min_dist_deque_dict[self.idx].append(min_dist)
-
-
-    # def action_append_agent(self, min_dist):
-    #     self.agent_action_deque_dict[self.idx].append(min_dist)
-
-
-    def plot(self,ep):
-
-        colors = [
-            'blue', 'green', 'red', 'purple', 'orange', 'yellow',
-            'lime', 'teal', 'cyan', 'magenta', 'pink', 'brown',
-            'grey', 'navy', 'gold', 'crimson', 'violet', 'indigo',
-            'tomato', 'turquoise', 'lavender', 'salmon', 'beige',
-            'mint', 'coral', 'chocolate', 'maroon', 'olive',
-            '#aaffc3', '#808000', '#ffd700', '#0048ba', '#b0bf1a',
-            '#7cb9e8', '#c0e8d5', '#b284be', '#72a0c1', '#f0f8ff',
-            '#e4717a', '#00ffff', '#a4c639', '#f4c2c2', '#915c83'
-        ]
-
-        ######################################################################################
-        #################################out take 수정 이전#####################################
-        ######################################################################################
-
-        ################################
-        ############case1###############
-        ################################
-
-        #전체
-        # num_set = prey_num_set(self.prey_number_deque_dict)
-        #
-        # positions_dict = find_prey_positions(num_set, self.prey_number_deque_dict)
-        #
-        # results = extract_values_based_on_positions(num_set, positions_dict,self.l2_before_outtake_deque_dict, self.l2_outtake_deque_dict)
-        #
-        # # 결과를 prey 에 따라 plotting
-        # plt.figure(figsize=(10, 6))
-        #
-        # for prey, coords in results.items():
-        #     if coords:  # 좌표가 있는 경우에만
-        #         x, y = zip(*coords)  # 숫자와 해당 값으로 분리
-        #         plt.plot(x, y, 'o-', color=colors[prey], label=f'prey {prey}')  # 점과 선으로 연결
-        #
-        # plt.xlabel('Ot')
-        # plt.ylabel('L2')
-        # plt.title('out take_ case1')
-        # plt.legend()
-        #
-        # wandb.log({"out take_ case1_ep_{}".format(ep): wandb.Image(plt)})
-        #
-        # plt.close()  # 현재 그림 닫기
-
-
-        ####################
-        ###predator1 team###
-        ####################
-
-        # prey_number_deque_dict_pred1 = {agent_idx: self.prey_number_deque_dict[agent_idx] for agent_idx in
-        #                           range(n_predator1)}
-        #
-        # l2_before_outtake_deque_dict_pred1 = {agent_idx: self.l2_before_outtake_deque_dict[agent_idx] for agent_idx in
-        #                                 range(n_predator1)}
-        #
-        # l2_outtake_deque_dict_pred1 = {agent_idx: self.l2_outtake_deque_dict[agent_idx] for agent_idx in
-        #                                       range(n_predator1)}
-        #
-        #
-        # num_set = prey_num_set(prey_number_deque_dict_pred1)
-        # positions_dict = find_prey_positions(num_set, prey_number_deque_dict_pred1)
-        # results = extract_values_based_on_positions(num_set, positions_dict, l2_before_outtake_deque_dict_pred1,
-        #                                             l2_outtake_deque_dict_pred1)
-        #
-        # # 결과를 prey 에 따라 plotting
-        # plt.figure(figsize=(10, 6))
-        #
-        # for prey, coords in results.items():
-        #     if coords:  # 좌표가 있는 경우에만
-        #         x, y = zip(*coords)  # 숫자와 해당 값으로 분리
-        #         plt.plot(x, y, 'o-', color=colors[prey], label=f'prey {prey}')  # 점과 선으로 연결
-        #
-        # plt.xlabel('Ot')
-        # plt.ylabel('L2')
-        # plt.title('out take_pred1_case1')
-        # plt.legend()
-        #
-        # wandb.log({"out take_pred1_case1_ep_{}".format(ep): wandb.Image(plt)})
-        #
-        # plt.close()  # 현재 그림 닫기
-
-        ####################
-        ###predator2 team###
-        ####################
-
-        # prey_number_deque_dict_pred2 = {agent_idx: self.prey_number_deque_dict[agent_idx] for agent_idx in
-        #                                 range(n_predator1,n_predator1+n_predator2)}
-        #
-        # l2_before_outtake_deque_dict_pred2 = {agent_idx: self.l2_before_outtake_deque_dict[agent_idx] for agent_idx in
-        #                                       range(n_predator1,n_predator1+n_predator2)}
-        #
-        # l2_outtake_deque_dict_pred2 = {agent_idx: self.l2_outtake_deque_dict[agent_idx] for agent_idx in
-        #                                range(n_predator1,n_predator1+n_predator2)}
-        #
-        # num_set = prey_num_set(prey_number_deque_dict_pred2)
-        # positions_dict = find_prey_positions(num_set, prey_number_deque_dict_pred2)
-        # results = extract_values_based_on_positions(num_set, positions_dict, l2_before_outtake_deque_dict_pred2,
-        #                                             l2_outtake_deque_dict_pred2)
-        #
-        # # 결과를 prey 에 따라 plotting
-        # plt.figure(figsize=(10, 6))
-        #
-        # for prey, coords in results.items():
-        #     if coords:  # 좌표가 있는 경우에만
-        #         x, y = zip(*coords)  # 숫자와 해당 값으로 분리
-        #         plt.plot(x, y, 'o-', color=colors[prey], label=f'prey {prey}')  # 점과 선으로 연결
-        #
-        # plt.xlabel('Ot')
-        # plt.ylabel('L2')
-        # plt.title('out take_pred2_case1')
-        # plt.legend()
-        #
-        # wandb.log({"out take_pred2_case1_ep_{}".format(ep): wandb.Image(plt)})
-        #
-        # plt.close()  # 현재 그림 닫기
-
-        ########################################################################################
-        #################################out take 수정 version###################################
-        ########################################################################################
-
-
-        #predtor1 에 대한 정보만 가져옴
-        prey_number_deque_dict_pred1 = {agent_idx: self.prey_number_deque_dict[agent_idx] for agent_idx in
-                                        range(self.n_predator1)}
-        prey_number_deque_dict_pred2 = {agent_idx: self.prey_number_deque_dict[agent_idx] for agent_idx in
-                                        range(self.n_predator1,self.n_predator1 + self.n_predator2)}
-
-        shared_mean_deque_dict_pred1 = {agent_idx: self.shared_mean_deque_dict[agent_idx] for agent_idx in
-                                       range(self.n_predator1)}
-        shared_mean_deque_dict_pred2 = {agent_idx: self.shared_mean_deque_dict[agent_idx] for agent_idx in
-                                        range(self.n_predator1, self.n_predator1 + self.n_predator2)}
-
-        #predator1에 대해서 observation 안에 prey의 수의 집합 set을 만든다.
-        results1 = self.extrack_plot_outtake(prey_number_deque_dict_pred1, shared_mean_deque_dict_pred1)
-        results2 = self.extrack_plot_outtake(prey_number_deque_dict_pred2, shared_mean_deque_dict_pred2)
-        # 결과를 prey 에 따라 plotting
-        plt.figure(figsize=(10, 6))
-
-        x1, y1 = zip(*results1)
-        plt.scatter(x1, y1, facecolors='none', edgecolors=colors[0], label="predator1")
-
-        x2, y2 = zip(*results2)
-        plt.scatter(x2, y2, facecolors='none', edgecolors=colors[1], label="predator2")
-
-
-        plt.xlabel('prey')
-        plt.ylabel('shared_mean')
-        plt.title('out take')
-        plt.legend()
-        # plt.show()
-
-        wandb.log({"out take1_ep_{}".format(ep): wandb.Image(plt)})
-
-        plt.close()  # 현재 그림 닫기
-
-        ################################
-        ############case2###############
-        ################################
-
-        # for agent in range(n_predator1 + n_predator2):
-        #     plt.figure(figsize=(10, 6))
-        #
-        #     pred1_ratio_list = list(self.agent_graph_overlap_pred1_deque_dict[agent])
-        #     pred2_ratio_list = list(self.agent_graph_overlap_pred2_deque_dict[agent])
-        #     # 이게 아니라 l2 값인게 말이 된다.
-        #
-        #     l2 = list(self.l2_outtake_deque_dict[agent])
-        #
-        #     plt.scatter(pred1_ratio_list, l2, facecolors='none', edgecolors=colors[0], label="predator overlap")
-        #     plt.scatter(pred2_ratio_list, l2, facecolors='none', edgecolors=colors[1], label="prey overlap")
-        #
-        #     plt.title('out take case1_predator1_{},ep_{}'.format(agent, ep))
-        #     plt.xlabel('overlap')
-        #     plt.ylabel('l2')
-        #     plt.legend()
-        #
-        #     wandb.log({'out take case1_predator1_{},ep_{}'.format(agent, ep): wandb.Image(plt)})
-        #
-        #     plt.close()  # 현재 그림 닫기
-
-        ##############################################################################
-        ##################################in take#####################################
-        ##############################################################################
+    def avg_dist_append_agent(self, avg_dist):
+        self.agent_avg_dist_deque_dict[self.idx].append(avg_dist)
+
+    def min_dist_append_agent(self, min_dist):
+        self.agent_min_dist_deque_dict[self.idx].append(min_dist)
+
+
+    def action_append_agent(self, min_dist):
+        self.agent_action_deque_dict[self.idx].append(min_dist)
+
+
+    # # def plot(self,ep):
+
+    # #     colors = [
+    # #         'blue', 'green', 'red', 'purple', 'orange', 'yellow',
+    # #         'lime', 'teal', 'cyan', 'magenta', 'pink', 'brown',
+    # #         'grey', 'navy', 'gold', 'crimson', 'violet', 'indigo',
+    # #         'tomato', 'turquoise', 'lavender', 'salmon', 'beige',
+    # #         'mint', 'coral', 'chocolate', 'maroon', 'olive',
+    # #         '#aaffc3', '#808000', '#ffd700', '#0048ba', '#b0bf1a',
+    # #         '#7cb9e8', '#c0e8d5', '#b284be', '#72a0c1', '#f0f8ff',
+    # #         '#e4717a', '#00ffff', '#a4c639', '#f4c2c2', '#915c83'
+    # #     ]
+
+    # #     ######################################################################################
+    # #     #################################out take 수정 이전#####################################
+    # #     ######################################################################################
+
+    # #     ################################
+    # #     ############case1###############
+    # #     ################################
+
+    # #     #전체
+    # #     # num_set = prey_num_set(self.prey_number_deque_dict)
+    # #     #
+    # #     # positions_dict = find_prey_positions(num_set, self.prey_number_deque_dict)
+    # #     #
+    # #     # results = extract_values_based_on_positions(num_set, positions_dict,self.l2_before_outtake_deque_dict, self.l2_outtake_deque_dict)
+    # #     #
+    # #     # # 결과를 prey 에 따라 plotting
+    # #     # plt.figure(figsize=(10, 6))
+    # #     #
+    # #     # for prey, coords in results.items():
+    # #     #     if coords:  # 좌표가 있는 경우에만
+    # #     #         x, y = zip(*coords)  # 숫자와 해당 값으로 분리
+    # #     #         plt.plot(x, y, 'o-', color=colors[prey], label=f'prey {prey}')  # 점과 선으로 연결
+    # #     #
+    # #     # plt.xlabel('Ot')
+    # #     # plt.ylabel('L2')
+    # #     # plt.title('out take_ case1')
+    # #     # plt.legend()
+    # #     #
+    # #     # wandb.log({"out take_ case1_ep_{}".format(ep): wandb.Image(plt)})
+    # #     #
+    # #     # plt.close()  # 현재 그림 닫기
+
+
+    # #     ####################
+    # #     ###predator1 team###
+    # #     ####################
+
+    # #     # prey_number_deque_dict_pred1 = {agent_idx: self.prey_number_deque_dict[agent_idx] for agent_idx in
+    # #     #                           range(n_predator1)}
+    # #     #
+    # #     # l2_before_outtake_deque_dict_pred1 = {agent_idx: self.l2_before_outtake_deque_dict[agent_idx] for agent_idx in
+    # #     #                                 range(n_predator1)}
+    # #     #
+    # #     # l2_outtake_deque_dict_pred1 = {agent_idx: self.l2_outtake_deque_dict[agent_idx] for agent_idx in
+    # #     #                                       range(n_predator1)}
+    # #     #
+    # #     #
+    # #     # num_set = prey_num_set(prey_number_deque_dict_pred1)
+    # #     # positions_dict = find_prey_positions(num_set, prey_number_deque_dict_pred1)
+    # #     # results = extract_values_based_on_positions(num_set, positions_dict, l2_before_outtake_deque_dict_pred1,
+    # #     #                                             l2_outtake_deque_dict_pred1)
+    # #     #
+    # #     # # 결과를 prey 에 따라 plotting
+    # #     # plt.figure(figsize=(10, 6))
+    # #     #
+    # #     # for prey, coords in results.items():
+    # #     #     if coords:  # 좌표가 있는 경우에만
+    # #     #         x, y = zip(*coords)  # 숫자와 해당 값으로 분리
+    # #     #         plt.plot(x, y, 'o-', color=colors[prey], label=f'prey {prey}')  # 점과 선으로 연결
+    # #     #
+    # #     # plt.xlabel('Ot')
+    # #     # plt.ylabel('L2')
+    # #     # plt.title('out take_pred1_case1')
+    # #     # plt.legend()
+    # #     #
+    # #     # wandb.log({"out take_pred1_case1_ep_{}".format(ep): wandb.Image(plt)})
+    # #     #
+    # #     # plt.close()  # 현재 그림 닫기
+
+    # #     ####################
+    # #     ###predator2 team###
+    # #     ####################
+
+    # #     # prey_number_deque_dict_pred2 = {agent_idx: self.prey_number_deque_dict[agent_idx] for agent_idx in
+    # #     #                                 range(n_predator1,n_predator1+n_predator2)}
+    # #     #
+    # #     # l2_before_outtake_deque_dict_pred2 = {agent_idx: self.l2_before_outtake_deque_dict[agent_idx] for agent_idx in
+    # #     #                                       range(n_predator1,n_predator1+n_predator2)}
+    # #     #
+    # #     # l2_outtake_deque_dict_pred2 = {agent_idx: self.l2_outtake_deque_dict[agent_idx] for agent_idx in
+    # #     #                                range(n_predator1,n_predator1+n_predator2)}
+    # #     #
+    # #     # num_set = prey_num_set(prey_number_deque_dict_pred2)
+    # #     # positions_dict = find_prey_positions(num_set, prey_number_deque_dict_pred2)
+    # #     # results = extract_values_based_on_positions(num_set, positions_dict, l2_before_outtake_deque_dict_pred2,
+    # #     #                                             l2_outtake_deque_dict_pred2)
+    # #     #
+    # #     # # 결과를 prey 에 따라 plotting
+    # #     # plt.figure(figsize=(10, 6))
+    # #     #
+    # #     # for prey, coords in results.items():
+    # #     #     if coords:  # 좌표가 있는 경우에만
+    # #     #         x, y = zip(*coords)  # 숫자와 해당 값으로 분리
+    # #     #         plt.plot(x, y, 'o-', color=colors[prey], label=f'prey {prey}')  # 점과 선으로 연결
+    # #     #
+    # #     # plt.xlabel('Ot')
+    # #     # plt.ylabel('L2')
+    # #     # plt.title('out take_pred2_case1')
+    # #     # plt.legend()
+    # #     #
+    # #     # wandb.log({"out take_pred2_case1_ep_{}".format(ep): wandb.Image(plt)})
+    # #     #
+    # #     # plt.close()  # 현재 그림 닫기
+
+    # #     ########################################################################################
+    # #     #################################out take 수정 version###################################
+    # #     ########################################################################################
+
+
+    # #     #predtor1 에 대한 정보만 가져옴
+    # #     prey_number_deque_dict_pred1 = {agent_idx: self.prey_number_deque_dict[agent_idx] for agent_idx in
+    # #                                     range(self.n_predator1)}
+    # #     prey_number_deque_dict_pred2 = {agent_idx: self.prey_number_deque_dict[agent_idx] for agent_idx in
+    # #                                     range(self.n_predator1,self.n_predator1 + self.n_predator2)}
+
+    # #     shared_mean_deque_dict_pred1 = {agent_idx: self.shared_mean_deque_dict[agent_idx] for agent_idx in
+    # #                                    range(self.n_predator1)}
+    # #     shared_mean_deque_dict_pred2 = {agent_idx: self.shared_mean_deque_dict[agent_idx] for agent_idx in
+    # #                                     range(self.n_predator1, self.n_predator1 + self.n_predator2)}
+
+    # #     #predator1에 대해서 observation 안에 prey의 수의 집합 set을 만든다.
+    # #     results1 = self.extrack_plot_outtake(prey_number_deque_dict_pred1, shared_mean_deque_dict_pred1)
+    # #     results2 = self.extrack_plot_outtake(prey_number_deque_dict_pred2, shared_mean_deque_dict_pred2)
+    # #     # 결과를 prey 에 따라 plotting
+    # #     plt.figure(figsize=(10, 6))
+
+    # #     x1, y1 = zip(*results1)
+    # #     plt.scatter(x1, y1, facecolors='none', edgecolors=colors[0], label="predator1")
+
+    # #     x2, y2 = zip(*results2)
+    # #     plt.scatter(x2, y2, facecolors='none', edgecolors=colors[1], label="predator2")
+
+
+    # #     plt.xlabel('prey')
+    # #     plt.ylabel('shared_mean')
+    # #     plt.title('out take')
+    # #     plt.legend()
+    # #     # plt.show()
+
+    # #     wandb.log({"out take1_ep_{}".format(ep): wandb.Image(plt)})
+
+    # #     plt.close()  # 현재 그림 닫기
+
+    # #     ################################
+    # #     ############case2###############
+    # #     ################################
+
+    # #     # for agent in range(n_predator1 + n_predator2):
+    # #     #     plt.figure(figsize=(10, 6))
+    # #     #
+    # #     #     pred1_ratio_list = list(self.agent_graph_overlap_pred1_deque_dict[agent])
+    # #     #     pred2_ratio_list = list(self.agent_graph_overlap_pred2_deque_dict[agent])
+    # #     #     # 이게 아니라 l2 값인게 말이 된다.
+    # #     #
+    # #     #     l2 = list(self.l2_outtake_deque_dict[agent])
+    # #     #
+    # #     #     plt.scatter(pred1_ratio_list, l2, facecolors='none', edgecolors=colors[0], label="predator overlap")
+    # #     #     plt.scatter(pred2_ratio_list, l2, facecolors='none', edgecolors=colors[1], label="prey overlap")
+    # #     #
+    # #     #     plt.title('out take case1_predator1_{},ep_{}'.format(agent, ep))
+    # #     #     plt.xlabel('overlap')
+    # #     #     plt.ylabel('l2')
+    # #     #     plt.legend()
+    # #     #
+    # #     #     wandb.log({'out take case1_predator1_{},ep_{}'.format(agent, ep): wandb.Image(plt)})
+    # #     #
+    # #     #     plt.close()  # 현재 그림 닫기
+
+    # #     ##############################################################################
+    # #     ##################################in take#####################################
+    # #     ##############################################################################
 
 
-        ################################
-        ############case1###############
-        ################################
+    # #     ################################
+    # #     ############case1###############
+    # #     ################################
 
-        #각각의 에이전트에 대해서 그려본다.
-        for agent in range(self.n_predator1 + self.n_predator2):
+    # #     #각각의 에이전트에 대해서 그려본다.
+    # #     for agent in range(self.n_predator1 + self.n_predator2):
 
-            plt.figure(figsize=(10, 6))
+    # #         plt.figure(figsize=(10, 6))
 
-            l2_intake= list(self.l2_intake_deque_dict[agent])
-            overlap_pred1 = list(self.intake_overlap_with_pred1[agent])
-            overlap_pred2 = list(self.intake_overlap_with_pred2[agent])
+    # #         l2_intake= list(self.l2_intake_deque_dict[agent])
+    # #         overlap_pred1 = list(self.intake_overlap_with_pred1[agent])
+    # #         overlap_pred2 = list(self.intake_overlap_with_pred2[agent])
 
-            plt.scatter(overlap_pred1 ,l2_intake, facecolors='none', edgecolors=colors[agent], label='about predator1')
-            plt.scatter(overlap_pred2, l2_intake, facecolors='none', edgecolors=colors[agent+1], label='about predator2')
+    # #         plt.scatter(overlap_pred1 ,l2_intake, facecolors='none', edgecolors=colors[agent], label='about predator1')
+    # #         plt.scatter(overlap_pred2, l2_intake, facecolors='none', edgecolors=colors[agent+1], label='about predator2')
 
 
-            plt.title("overlap ratio - l2_agent{}_ep_{}".format(agent,ep))
-            plt.xlabel('overlap tiles')
-            plt.ylabel('l2')
-            plt.legend()
+    # #         plt.title("overlap ratio - l2_agent{}_ep_{}".format(agent,ep))
+    # #         plt.xlabel('overlap tiles')
+    # #         plt.ylabel('l2')
+    # #         plt.legend()
 
-            wandb.log({"overlap ratio - l2_agent{}_ep_{}".format(agent,ep): wandb.Image(plt)})
+    # #         wandb.log({"overlap ratio - l2_agent{}_ep_{}".format(agent,ep): wandb.Image(plt)})
 
-            plt.close()  # 현재 그림 닫기
+    # #         plt.close()  # 현재 그림 닫기
 
-            # 수정한 intake
-            # intake_sum_with_pred1 = intake_sum(book, after_gnn, overlap_tiles_pred1)
-            # intake_sum_with_pred2 = intake_sum(book, after_gnn, overlap_tiles_pred2)
-            # madqn.intake_sum_with_pred1_deque_dict[idx].append(intake_sum_with_pred1)
-            # madqn.intake_sum_with_pred2_deque_dict[idx].append(intake_sum_with_pred2)
-            #
-            # intake_inner_with_pred1 = intake_inner(book, after_gnn, overlap_tiles_pred1)
-            # intake_inner_with_pred2 = intake_inner(book, after_gnn, overlap_tiles_pred2)
-            # madqn.intake_inner_with_pred1_deque_dict[idx].append(intake_inner_with_pred1)
-            # madqn.intake_inner_with_pred2_deque_dict[idx].append(intake_inner_with_pred2)
-            #
-            # madqn.tiles_number_with_pred1_deque_dict[idx].append(len(overlap_tiles_pred1))
-            # madqn.tiles_number_with_pred2_deque_dict[idx].append(len(overlap_tiles_pred2))
+    # #         # 수정한 intake
+    # #         # intake_sum_with_pred1 = intake_sum(book, after_gnn, overlap_tiles_pred1)
+    # #         # intake_sum_with_pred2 = intake_sum(book, after_gnn, overlap_tiles_pred2)
+    # #         # madqn.intake_sum_with_pred1_deque_dict[idx].append(intake_sum_with_pred1)
+    # #         # madqn.intake_sum_with_pred2_deque_dict[idx].append(intake_sum_with_pred2)
+    # #         #
+    # #         # intake_inner_with_pred1 = intake_inner(book, after_gnn, overlap_tiles_pred1)
+    # #         # intake_inner_with_pred2 = intake_inner(book, after_gnn, overlap_tiles_pred2)
+    # #         # madqn.intake_inner_with_pred1_deque_dict[idx].append(intake_inner_with_pred1)
+    # #         # madqn.intake_inner_with_pred2_deque_dict[idx].append(intake_inner_with_pred2)
+    # #         #
+    # #         # madqn.tiles_number_with_pred1_deque_dict[idx].append(len(overlap_tiles_pred1))
+    # #         # madqn.tiles_number_with_pred2_deque_dict[idx].append(len(overlap_tiles_pred2))
 
-        for agent in range(self.n_predator1 + self.n_predator2):
+    # #     for agent in range(self.n_predator1 + self.n_predator2):
 
-            tiles_num_with_pred1 = list(self.tiles_number_with_pred1_deque_dict[agent])
-            tiles_num_with_pred2 = list(self.tiles_number_with_pred2_deque_dict[agent])
+    # #         tiles_num_with_pred1 = list(self.tiles_number_with_pred1_deque_dict[agent])
+    # #         tiles_num_with_pred2 = list(self.tiles_number_with_pred2_deque_dict[agent])
 
-            intake_sum_with_pred1 = list(self.intake_sum_with_pred1_deque_dict[agent])
-            intake_sum_with_pred2 = list(self.intake_sum_with_pred2_deque_dict[agent])
+    # #         intake_sum_with_pred1 = list(self.intake_sum_with_pred1_deque_dict[agent])
+    # #         intake_sum_with_pred2 = list(self.intake_sum_with_pred2_deque_dict[agent])
 
-            intake_inner_with_pred1 = list(self.intake_inner_with_pred1_deque_dict[agent])
-            intake_inner_with_pred2 = list(self.intake_inner_with_pred2_deque_dict[agent])
+    # #         intake_inner_with_pred1 = list(self.intake_inner_with_pred1_deque_dict[agent])
+    # #         intake_inner_with_pred2 = list(self.intake_inner_with_pred2_deque_dict[agent])
 
-            plt.figure(figsize=(10, 6))
+    # #         plt.figure(figsize=(10, 6))
 
-            plt.scatter(tiles_num_with_pred1, intake_sum_with_pred1, facecolors='none', edgecolors=colors[agent],
-                        label='about predator1')
-            plt.scatter(tiles_num_with_pred2, intake_sum_with_pred2, facecolors='none', edgecolors=colors[agent],
-                        label='about predator1')
+    # #         plt.scatter(tiles_num_with_pred1, intake_sum_with_pred1, facecolors='none', edgecolors=colors[agent],
+    # #                     label='about predator1')
+    # #         plt.scatter(tiles_num_with_pred2, intake_sum_with_pred2, facecolors='none', edgecolors=colors[agent],
+    # #                     label='about predator1')
 
-            plt.title("intake_sum_agent{}_ep_{}".format(agent, ep))
-            plt.xlabel('overlap tiles number')
-            plt.ylabel('sum of squared differences')
-            plt.legend()
+    # #         plt.title("intake_sum_agent{}_ep_{}".format(agent, ep))
+    # #         plt.xlabel('overlap tiles number')
+    # #         plt.ylabel('sum of squared differences')
+    # #         plt.legend()
 
-            wandb.log({"intake_sum_agent{}_ep_{}".format(agent, ep): wandb.Image(plt)})
+    # #         wandb.log({"intake_sum_agent{}_ep_{}".format(agent, ep): wandb.Image(plt)})
 
-            plt.close()  # 현재 그림 닫기
+    # #         plt.close()  # 현재 그림 닫기
 
-            plt.figure(figsize=(10, 6))
+    # #         plt.figure(figsize=(10, 6))
 
-            plt.scatter(tiles_num_with_pred1, intake_inner_with_pred1, facecolors='none', edgecolors=colors[agent],
-                        label='about predator1')
-            plt.scatter(tiles_num_with_pred2, intake_inner_with_pred2, facecolors='none', edgecolors=colors[agent],
-                        label='about predator1')
+    # #         plt.scatter(tiles_num_with_pred1, intake_inner_with_pred1, facecolors='none', edgecolors=colors[agent],
+    # #                     label='about predator1')
+    # #         plt.scatter(tiles_num_with_pred2, intake_inner_with_pred2, facecolors='none', edgecolors=colors[agent],
+    # #                     label='about predator1')
 
-            plt.title("intake_inner_agent{}_ep_{}".format(agent, ep))
-            plt.xlabel('overlap tiles number')
-            plt.ylabel('inner product')
-            plt.legend()
+    # #         plt.title("intake_inner_agent{}_ep_{}".format(agent, ep))
+    # #         plt.xlabel('overlap tiles number')
+    # #         plt.ylabel('inner product')
+    # #         plt.legend()
 
-            wandb.log({"intake_inner_agent{}_ep_{}".format(agent, ep): wandb.Image(plt)})
+    # #         wandb.log({"intake_inner_agent{}_ep_{}".format(agent, ep): wandb.Image(plt)})
 
-            plt.close()  # 현재 그림 닫기
+    # #         plt.close()  # 현재 그림 닫기
 
-        ################################
-        ############case2###############
-        ################################
+    #     ################################
+    #     ############case2###############
+    #     ################################
 
 
 
 
 
 
-        ##############################################################################
-        ###############################phenomenon#####################################
-        ##############################################################################
+    #     ##############################################################################
+    #     ###############################phenomenon#####################################
+    #     ##############################################################################
 
 
 
-        ############################################################
-        ########################for each team#######################
-        ############################################################
+    #     ############################################################
+    #     ########################for each team#######################
+    #     ############################################################
 
-        jitter_std = self.jitter_std
+    #     jitter_std = self.jitter_std
 
-        avg_dist_list_pred1 = list(self.avg_dist_deque_pred1)
-        avg_dist_list_pred2 = list(self.avg_dist_deque_pred2)
+    #     avg_dist_list_pred1 = list(self.avg_dist_deque_pred1)
+    #     avg_dist_list_pred2 = list(self.avg_dist_deque_pred2)
 
-        min_dist_list_pred1 = list(self.min_dist_deque_pred1)
-        min_dist_list_pred2 = list(self.min_dist_deque_pred2)
+    #     min_dist_list_pred1 = list(self.min_dist_deque_pred1)
+    #     min_dist_list_pred2 = list(self.min_dist_deque_pred2)
 
-        avg_move_list_pred1 = list(self.avg_move_deque_pred1)
-        avg_move_list_pred2 = list(self.avg_move_deque_pred2)
+    #     avg_move_list_pred1 = list(self.avg_move_deque_pred1)
+    #     avg_move_list_pred2 = list(self.avg_move_deque_pred2)
 
-        avg_tag_list_pred1 = list(self.avg_tag_deque_pred1)
-        avg_tag_list_pred2 = list(self.avg_tag_deque_pred2)
+    #     avg_tag_list_pred1 = list(self.avg_tag_deque_pred1)
+    #     avg_tag_list_pred2 = list(self.avg_tag_deque_pred2)
 
-        ###################################
-        #### avg(distance) - avg(move)#####
-        ###################################
+    #     ###################################
+    #     #### avg(distance) - avg(move)#####
+    #     ###################################
 
-        plt.figure(figsize=(10, 6))
+    #     plt.figure(figsize=(10, 6))
 
-        plt.scatter(avg_dist_list_pred1 + np.random.normal(0, jitter_std, len(avg_dist_list_pred1)),
-                    avg_move_list_pred1, facecolors='none', edgecolors='blue', label='pred1')
-        plt.scatter(avg_dist_list_pred2 + np.random.normal(0, jitter_std, len(avg_dist_list_pred2)),
-                    avg_move_list_pred2, facecolors='none', edgecolors='red', label='pred2')
+    #     plt.scatter(avg_dist_list_pred1 + np.random.normal(0, jitter_std, len(avg_dist_list_pred1)),
+    #                 avg_move_list_pred1, facecolors='none', edgecolors='blue', label='pred1')
+    #     plt.scatter(avg_dist_list_pred2 + np.random.normal(0, jitter_std, len(avg_dist_list_pred2)),
+    #                 avg_move_list_pred2, facecolors='none', edgecolors='red', label='pred2')
 
-        plt.title('avg dist : avg_move')
-        plt.xlabel('avg_dist')
-        plt.ylabel('avg_move')
-        plt.legend()
+    #     plt.title('avg dist : avg_move')
+    #     plt.xlabel('avg_dist')
+    #     plt.ylabel('avg_move')
+    #     plt.legend()
 
 
-        wandb.log({"avg dist : avg_move_ep_{}".format(ep): wandb.Image(plt)})
+    #     wandb.log({"avg dist : avg_move_ep_{}".format(ep): wandb.Image(plt)})
 
-        plt.close()  # 현재 그림 닫기
+    #     plt.close()  # 현재 그림 닫기
 
-        ###################################
-        #### min(distance) - avg(move)#####
-        ###################################
+    #     ###################################
+    #     #### min(distance) - avg(move)#####
+    #     ###################################
 
-        plt.figure(figsize=(10, 6))
-        plt.scatter(min_dist_list_pred1 + np.random.normal(0, jitter_std, len(min_dist_list_pred1)),
-                    avg_move_list_pred1, facecolors='none', edgecolors='blue', label='pred1')
-        plt.scatter(min_dist_list_pred2 + np.random.normal(0, jitter_std, len(min_dist_list_pred2)),
-                    avg_move_list_pred2, facecolors='none', edgecolors='red', label='pred2')
+    #     plt.figure(figsize=(10, 6))
+    #     plt.scatter(min_dist_list_pred1 + np.random.normal(0, jitter_std, len(min_dist_list_pred1)),
+    #                 avg_move_list_pred1, facecolors='none', edgecolors='blue', label='pred1')
+    #     plt.scatter(min_dist_list_pred2 + np.random.normal(0, jitter_std, len(min_dist_list_pred2)),
+    #                 avg_move_list_pred2, facecolors='none', edgecolors='red', label='pred2')
 
-        plt.title('min move for the avg distance')
-        plt.xlabel('min_dist')
-        plt.ylabel('avg_move')
-        plt.legend()
+    #     plt.title('min move for the avg distance')
+    #     plt.xlabel('min_dist')
+    #     plt.ylabel('avg_move')
+    #     plt.legend()
 
 
-        wandb.log({"min move for the avg distance_ep_{}".format(ep): wandb.Image(plt)})
+    #     wandb.log({"min move for the avg distance_ep_{}".format(ep): wandb.Image(plt)})
 
-        plt.close()  # 현재 그림 닫기
+    #     plt.close()  # 현재 그림 닫기
 
-        ###################################
-        #### min(distance) - avg(tag)######
-        ###################################
+    #     ###################################
+    #     #### min(distance) - avg(tag)######
+    #     ###################################
 
-        plt.figure(figsize=(10, 6))
-        plt.scatter(min_dist_list_pred1 + np.random.normal(0, jitter_std, len(min_dist_list_pred1)),
-                    avg_tag_list_pred1, facecolors='none', edgecolors='blue', label='pred1')
-        plt.scatter(min_dist_list_pred2 + np.random.normal(0, jitter_std, len(min_dist_list_pred2)),
-                    avg_tag_list_pred2, facecolors='none', edgecolors='red', label='pred2')
+    #     plt.figure(figsize=(10, 6))
+    #     plt.scatter(min_dist_list_pred1 + np.random.normal(0, jitter_std, len(min_dist_list_pred1)),
+    #                 avg_tag_list_pred1, facecolors='none', edgecolors='blue', label='pred1')
+    #     plt.scatter(min_dist_list_pred2 + np.random.normal(0, jitter_std, len(min_dist_list_pred2)),
+    #                 avg_tag_list_pred2, facecolors='none', edgecolors='red', label='pred2')
 
-        plt.title('min_dist : avg_tag')
-        plt.xlabel('min_dist')
-        plt.ylabel('avg_tag')
-        plt.legend()
+    #     plt.title('min_dist : avg_tag')
+    #     plt.xlabel('min_dist')
+    #     plt.ylabel('avg_tag')
+    #     plt.legend()
 
-        wandb.log({"min_dist : avg_tag_ep_{}".format(ep): wandb.Image(plt)})
+    #     wandb.log({"min_dist : avg_tag_ep_{}".format(ep): wandb.Image(plt)})
 
-        plt.close()  # 현재 그림 닫기
+    #     plt.close()  # 현재 그림 닫기
 
-        ###################################
-        #### avg(distance) - avg(tag)######
-        ###################################
+    #     ###################################
+    #     #### avg(distance) - avg(tag)######
+    #     ###################################
 
 
-        plt.figure(figsize=(10, 6))
-        plt.scatter(avg_dist_list_pred1 + np.random.normal(0, jitter_std, len(min_dist_list_pred1)),
-                    avg_tag_list_pred1, facecolors='none', edgecolors='blue', label='pred1')
-        plt.scatter(avg_dist_list_pred2 + np.random.normal(0, jitter_std, len(min_dist_list_pred2)),
-                    avg_tag_list_pred2, facecolors='none', edgecolors='red', label='pred2')
+    #     plt.figure(figsize=(10, 6))
+    #     plt.scatter(avg_dist_list_pred1 + np.random.normal(0, jitter_std, len(min_dist_list_pred1)),
+    #                 avg_tag_list_pred1, facecolors='none', edgecolors='blue', label='pred1')
+    #     plt.scatter(avg_dist_list_pred2 + np.random.normal(0, jitter_std, len(min_dist_list_pred2)),
+    #                 avg_tag_list_pred2, facecolors='none', edgecolors='red', label='pred2')
 
-        plt.title('avg_dist : avg_tag')
-        plt.xlabel('avg_dist')
-        plt.ylabel('avg_tag')
-        plt.legend()
+    #     plt.title('avg_dist : avg_tag')
+    #     plt.xlabel('avg_dist')
+    #     plt.ylabel('avg_tag')
+    #     plt.legend()
 
-        wandb.log({"avg_dist : avg_tag_ep_{}".format(ep): wandb.Image(plt)})
+    #     wandb.log({"avg_dist : avg_tag_ep_{}".format(ep): wandb.Image(plt)})
 
-        plt.close()  # 현재 그림 닫기
+    #     plt.close()  # 현재 그림 닫기
 
-        ###################################################################
-        ###########################for one agent###########################
-        ###################################################################
+    #     ###################################################################
+    #     ###########################for one agent###########################
+    #     ###################################################################
 
-        ################################
-        #### min(distance) - action#####
-        ################################
-        #predator1
+    #     ################################
+    #     #### min(distance) - action#####
+    #     ################################
+    #     #predator1
 
-        plt.figure(figsize=(10, 6))
+    #     plt.figure(figsize=(10, 6))
 
-        for agent in range(self.n_predator1):
+    #     for agent in range(self.n_predator1):
 
-            min_dist_list = list(self.agent_min_dist_deque_dict[agent])
-            action_list = list(self.agent_action_deque_dict[agent])
+    #         min_dist_list = list(self.agent_min_dist_deque_dict[agent])
+    #         action_list = list(self.agent_action_deque_dict[agent])
 
-            plt.scatter(min_dist_list + np.random.normal(0, jitter_std, len(avg_dist_list_pred1)),
-                        action_list, facecolors='none', edgecolors=colors[agent], label='agent_{}'.format(agent))
+    #         plt.scatter(min_dist_list + np.random.normal(0, jitter_std, len(avg_dist_list_pred1)),
+    #                     action_list, facecolors='none', edgecolors=colors[agent], label='agent_{}'.format(agent))
 
-        plt.title('pred1 ->min dist : action')
-        plt.xlabel('min dist')
-        plt.ylabel('action')
-        plt.legend()
+    #     plt.title('pred1 ->min dist : action')
+    #     plt.xlabel('min dist')
+    #     plt.ylabel('action')
+    #     plt.legend()
 
-        wandb.log({"pred1_agent_min dist : action_ep_{}".format(ep): wandb.Image(plt)})
+    #     wandb.log({"pred1_agent_min dist : action_ep_{}".format(ep): wandb.Image(plt)})
 
-        plt.close()  # 현재 그림 닫기
+    #     plt.close()  # 현재 그림 닫기
 
-        # predator2
-        plt.figure(figsize=(10, 6))
+    #     # predator2
+    #     plt.figure(figsize=(10, 6))
 
-        for agent in range(self.n_predator2):
-            min_dist_list = list(self.agent_min_dist_deque_dict[self.n_predator1+agent])
-            action_list = list(self.agent_action_deque_dict[self.n_predator1+agent])
+    #     for agent in range(self.n_predator2):
+    #         min_dist_list = list(self.agent_min_dist_deque_dict[self.n_predator1+agent])
+    #         action_list = list(self.agent_action_deque_dict[self.n_predator1+agent])
 
-            plt.scatter(min_dist_list + np.random.normal(0, jitter_std, len(avg_dist_list_pred1)),
-                        action_list, facecolors='none', edgecolors=colors[agent], label='agent_{}'.format(agent+self.n_predator1))
+    #         plt.scatter(min_dist_list + np.random.normal(0, jitter_std, len(avg_dist_list_pred1)),
+    #                     action_list, facecolors='none', edgecolors=colors[agent], label='agent_{}'.format(agent+self.n_predator1))
 
-        plt.title('pred2 -> min dist : action')
-        plt.xlabel('min dist')
-        plt.ylabel('action')
-        plt.legend()
+    #     plt.title('pred2 -> min dist : action')
+    #     plt.xlabel('min dist')
+    #     plt.ylabel('action')
+    #     plt.legend()
 
-        wandb.log({"pred2_agent_min dist : action_ep_{}".format(ep): wandb.Image(plt)})
+    #     wandb.log({"pred2_agent_min dist : action_ep_{}".format(ep): wandb.Image(plt)})
 
-        plt.close()  # 현재 그림 닫기
+    #     plt.close()  # 현재 그림 닫기
 
-        ################################
-        #### avg(distance) - action#####
-        ################################
-        # predator1
+    #     ################################
+    #     #### avg(distance) - action#####
+    #     ################################
+    #     # predator1
 
-        plt.figure(figsize=(10, 6))
+    #     plt.figure(figsize=(10, 6))
 
-        for agent in range(self.n_predator1):
-            avg_dist_list = list(self.agent_avg_dist_deque_dict[agent])
-            action_list = list(self.agent_action_deque_dict[agent])
+    #     for agent in range(self.n_predator1):
+    #         avg_dist_list = list(self.agent_avg_dist_deque_dict[agent])
+    #         action_list = list(self.agent_action_deque_dict[agent])
 
-            plt.scatter(avg_dist_list + np.random.normal(0, jitter_std, len(avg_dist_list)),
-                        action_list, facecolors='none', edgecolors=colors[agent], label='agent_{}'.format(agent))
+    #         plt.scatter(avg_dist_list + np.random.normal(0, jitter_std, len(avg_dist_list)),
+    #                     action_list, facecolors='none', edgecolors=colors[agent], label='agent_{}'.format(agent))
 
-        plt.title('pred1 ->avg dist : action')
-        plt.xlabel('avg dist')
-        plt.ylabel('action')
-        plt.legend()
+    #     plt.title('pred1 ->avg dist : action')
+    #     plt.xlabel('avg dist')
+    #     plt.ylabel('action')
+    #     plt.legend()
 
-        wandb.log({"pred1_agent_avg dist : action_ep_{}".format(ep): wandb.Image(plt)})
+    #     wandb.log({"pred1_agent_avg dist : action_ep_{}".format(ep): wandb.Image(plt)})
 
-        plt.close()  # 현재 그림 닫기
+    #     plt.close()  # 현재 그림 닫기
 
-        # predator2
+    #     # predator2
 
-        plt.figure(figsize=(10, 6))
+    #     plt.figure(figsize=(10, 6))
 
-        for agent in range(self.n_predator2):
-            avg_dist_list = list(self.agent_avg_dist_deque_dict[self.n_predator1 + agent])
-            action_list = list(self.agent_action_deque_dict[self.n_predator1 + agent])
+    #     for agent in range(self.n_predator2):
+    #         avg_dist_list = list(self.agent_avg_dist_deque_dict[self.n_predator1 + agent])
+    #         action_list = list(self.agent_action_deque_dict[self.n_predator1 + agent])
 
-            plt.scatter(avg_dist_list + np.random.normal(0, jitter_std, len(avg_dist_list)),
-                        action_list, facecolors='none', edgecolors=colors[agent],
-                        label='agent_{}'.format(agent + self.n_predator1))
+    #         plt.scatter(avg_dist_list + np.random.normal(0, jitter_std, len(avg_dist_list)),
+    #                     action_list, facecolors='none', edgecolors=colors[agent],
+    #                     label='agent_{}'.format(agent + self.n_predator1))
 
-        plt.title('pred2 -> avg dist : action')
-        plt.xlabel('avg dist')
-        plt.ylabel('action')
-        plt.legend()
+    #     plt.title('pred2 -> avg dist : action')
+    #     plt.xlabel('avg dist')
+    #     plt.ylabel('action')
+    #     plt.legend()
 
-        wandb.log({"pred2_agent_avg dist : action_ep_{}".format(ep): wandb.Image(plt)})
+    #     wandb.log({"pred2_agent_avg dist : action_ep_{}".format(ep): wandb.Image(plt)})
 
-        plt.close()  # 현재 그림 닫기
+    #     plt.close()  # 현재 그림 닫기
