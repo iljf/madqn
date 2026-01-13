@@ -25,7 +25,7 @@ def get_args():
     parser.add_argument('--jitter_std', type=float, default=0.5)
 
     parser.add_argument('--buffer_size', type=int, default=100000)
-    parser.add_argument('--trainstart_buffersize', type=int, default=30000)
+    parser.add_argument('--trainstart_buffersize', type=int, default=9000)
     parser.add_argument('--deque_len', type=int, default=400)
     parser.add_argument('--plot_term', type=int, default=10)
 
@@ -169,6 +169,7 @@ def main():
         shared = th.zeros(shared_shape)
         madqn.reset_shared(shared)
 
+        # reset ep_move_count : ? ?????? Plot? ??? ?? ?? action? ???? ????? ???? ??
         madqn.reset_ep_move_count()
 
         # env reset
@@ -229,7 +230,7 @@ def main():
             if (((n_iteration) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0) and (n_agents > 0):
 
                 if step_idx_ep > 0:
-                    madqn.shared_decay()
+                    madqn.shared_decay() 
 
                     if step_idx_ep != args.max_update_steps: # shared_book update
 
@@ -264,6 +265,7 @@ def main():
 
                             # Add recent Step information
                             for idx in range(n_predator1 + n_predator2):
+
                                 madqn.set_agent_pos(agent_pos[idx][-1])
 
                                 if idx < args.n_predator1:
@@ -371,7 +373,7 @@ def main():
                             step_rewards += np.sum(agent_rewards[-1])
 
                         for penalty in move_penalty_dict.values():
-                            step_penalty_rewards += np.sum(penalty[-1])
+                            step_penalty_rewards += np.sum(penalty[-2])
 
                         # ?? ? ??? ??? ? ???? ?? reward? ???? ??
                         step_rewards = step_rewards + step_penalty_rewards
@@ -765,11 +767,7 @@ def main():
 
                     # move
                     if action in [0, 1, 3, 4]:
-                        # predator1만 move_penalty 적용
-                        if idx < n_predator1:
-                            move_penalty_dict[idx].append(args.move_penalty)
-                        else:
-                            move_penalty_dict[idx].append(0)
+                        move_penalty_dict[idx].append(args.move_penalty)
                         madqn.ep_move_count()  # ep ? ?? move ? ??
                         madqn.step_move_count()  # step ??  ?? ??? ???? +1 ? ???.
                         move = 1
@@ -908,11 +906,11 @@ def main():
 
         if (ep % args.ep_save) == 0:
             for i in range(len(madqn.gdqns)):
-                path = 'final_model/model_save/' + 'model_' + str(i) + '_ep' + str(ep) + '.pt'
+                path = 'model_save/' + 'model_' + str(i) + '_ep' + str(ep) + '.pt'
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 th.save(madqn.gdqns[i].state_dict(), path)
 
-                path_t = 'final_model/model_save/' + 'model_target_' + str(i) + '_ep' + str(ep) + '.pt'
+                path_t = 'model_save/' + 'model_target_' + str(i) + '_ep' + str(ep) + '.pt'
                 os.makedirs(os.path.dirname(path_t), exist_ok=True)
                 th.save(madqn.gdqn_targets[i].state_dict(), path_t)
 

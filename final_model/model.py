@@ -21,7 +21,6 @@ class G_DQN(nn.Module):
         self.dim_feature = observation_state[2]
         self.gnn1 = DenseSAGEConv(self.dim_feature, 128)
         self.gnn2 = DenseSAGEConv(128, self.dim_feature*2)
-        self.sig = nn.Sigmoid() #sigmoid ? ??? ?? ??..
 
         #info
         self.dim_info = observation_state[2]
@@ -33,21 +32,19 @@ class G_DQN(nn.Module):
         self.FC1 = nn.Linear(self.dim_input, 128)
         self.FC2 = nn.Linear(128, dim_act)
 
+        #Book linear + Gate
+        self.out_linear = nn.Linear(2*self.dim_feature, self.dim_feature)
+        self.gate_net = nn.Linear(self.dim_feature, self.dim_feature)
+
         self.relu = nn.ReLU()
 
 
     def forward(self, x, adj, info):
-
-        try:
-            torch.cuda.empty_cache()
-        except:
-            pass
-
-
         if isinstance(x, np.ndarray):
             x = torch.tensor(x).float()
         else:
             pass
+
 
         x_pre = x.reshape(-1, self.dim_feature)
 
@@ -56,21 +53,28 @@ class G_DQN(nn.Module):
         x1 = self.gnn2(x1, adj).squeeze()
         x1 = self.tanh(x1)
 
-        dqn = x1[:, :self.dim_feature]
+        # devide features for DQN and intake
+        dqn_feature = x1[:, :self.dim_feature] # dqn features
+        shared_feature = x1[:, self.dim_feature:] # intake features
 
-        shared = self.tanh(x1[:, self.dim_feature:])
+        # dqn = x1[:, :self.dim_feature]
+        # shared = self.tanh(x1[:, self.dim_feature:])
 
-        shared = dqn * shared
+        # outtake branch
+        Net = torch.tanh(shared_feature)
 
+        # outtake nodes
+        b_t = dqn_feature * Net
+        shared1 = b_t.reshape(self.observation_state)
 
-        shared1 = shared.reshape(self.observation_state)
-
-
+        # L2 norms for outtake ratio
         l2_before = torch.norm(x, p=2)
         l2_outtake = torch.norm(shared1, p=2)
 
         outtake_ratio = l2_outtake / (l2_before + 1e-8)
+        shared_sum = torch.mean(shared1)
 
+        # intake branch
         info_pre = info.reshape(-1, self.dim_feature)
         x2 = self.gnn1_info(info_pre,adj)
         x2 = self.tanh(x2)
@@ -78,16 +82,23 @@ class G_DQN(nn.Module):
         x2 = self.tanh(x2)
         x2 = x2.reshape(self.observation_state)
 
-        l2_intake = torch.norm(x2, p=2) / torch.norm(info, p=2)
+        l2_intake = torch.norm(x2, p=2) / (torch.norm(info, p=2) + 1e-8)
 
-        x3 = torch.cat((shared1, x2), dim=0).reshape(-1, self.dim_input).squeeze()
+        # ---DQN head---
+        # dqn feature + intake branch (x2)
+        Q_t = dqn_feature.reshape(self.observation_state)
 
-        x3 = self.FC1(x3)
+        Q_input = torch.cat((Q_t, x2), dim=0)
+        Q_input = Q_input.reshape(-1, self.dim_input).squeeze()
+
+        # x3 = torch.cat((shared1, x2), dim=0).reshape(-1, self.dim_input).squeeze()
+
+        x3 = self.FC1(Q_input)
         x3 = self.tanh(x3)
         x3 = self.FC2(x3)
 
         # np.mean(shared) 는 에이전트가 정보를 어떻게 남기는지 보려고 하는 것
-        return x3, shared1.detach(), l2_before.detach(), l2_outtake.detach() ,shared.sum().detach(), l2_intake.detach() , x2.detach(), outtake_ratio.detach()
+        return x3, shared1, l2_before, l2_outtake, shared_sum, l2_intake , x2, outtake_ratio
 
     # def forward(self, x, adj, info):
     #
