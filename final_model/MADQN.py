@@ -743,10 +743,10 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         book = self.from_guestbook()
 
         # G_DQN forward
-        q_value, shared_info, l2_before, l2_outtake, shared_sum, l2_intake, after_gnn, outtake_ratio = self.gdqn(
+        q_value, shared1, l2_before, l2_outtake, shared_sum, l2_intake, after_gnn, outtake_ratio = self.gdqn(
             torch.tensor(state).to(self.device), self.adj.to(self.device), book.to(self.device))
         
-        shared_info = shared_info.detach()
+        shared_info = shared1.detach()
         l2_before = l2_before.detach()
         l2_outtake = l2_outtake.detach()
         shared_sum = shared_sum.detach()
@@ -759,14 +759,12 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         if self.epsilon < self.eps_min:
             self.epsilon = self.eps_min
 
-
-
         if np.random.random() < self.epsilon:
             action =  random.randint(0, self.dim_act - 1)
         else: action = int(torch.argmax(q_value).item())
 
-        # detached outtake to guestbook
-        self.to_guestbook(shared_info.detach())
+        # detached info to guestbook
+        self.to_guestbook(shared1.detach())
 
         # Ensure book and after_gnn are on the correct device before returning
         book = book.to(self.device) if hasattr(book, 'to') else book
@@ -807,11 +805,11 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
             loss_td = self.criterion(q_value, target_q)
 
             # ---- outtake regularizer ----
-            if self.team_idx == 0:
+            if self.team_idx == 0: # predator1
                 tau = self.tau_predator1
                 lamda = self.lamda_predator1
             else:
-                tau = self.tau_predator2
+                tau = self.tau_predator2 # predator2
                 lamda = self.lamda_predator2
 
             # ---- outtake loss ----

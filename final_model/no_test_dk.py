@@ -25,12 +25,17 @@ def get_args():
     parser.add_argument('--jitter_std', type=float, default=0.5)
 
     parser.add_argument('--buffer_size', type=int, default=100000)
-    parser.add_argument('--trainstart_buffersize', type=int, default=9000)
+    parser.add_argument('--trainstart_buffersize', type=int, default=3000)
     parser.add_argument('--deque_len', type=int, default=400)
     parser.add_argument('--plot_term', type=int, default=10)
 
     parser.add_argument('--replay_times', type=int, default=32)
     parser.add_argument('--target_update', type=int, default=10)
+
+    parser.add_argument('--tau_predator1', type=float, default=0.2)
+    parser.add_argument('--tau_predator2', type=float, default=0.2)
+    parser.add_argument('--lamda_predator1', type=float, default=0.3)
+    parser.add_argument('--lamda_predator2', type=float, default=0.7)
 
     parser.add_argument('--map_size', type=int, default=24)
     parser.add_argument('--predator1_view_range', type=int, default=10)
@@ -42,7 +47,7 @@ def get_args():
     parser.add_argument('--tag_penalty', type=float, default=-0.2)
     parser.add_argument('--move_penalty', type=float, default=-0.15)
 
-    parser.add_argument('--seed', type=int, default=874)
+    parser.add_argument('--seed', type=int, default=125)
 
     return parser.parse_args()
 
@@ -767,7 +772,11 @@ def main():
 
                     # move
                     if action in [0, 1, 3, 4]:
-                        move_penalty_dict[idx].append(args.move_penalty)
+                        # predator1
+                        if idx < n_predator1:
+                            move_penalty_dict[idx].append(args.move_penalty)
+                        else:
+                            move_penalty_dict[idx].append(0)
                         madqn.ep_move_count()  # ep ? ?? move ? ??
                         madqn.step_move_count()  # step ??  ?? ??? ???? +1 ? ???.
                         move = 1
