@@ -766,7 +766,7 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         # detached info to guestbook
         self.to_guestbook(shared1.detach())
 
-        # Ensure book and after_gnn are on the correct device before returning
+        
         book = book.to(self.device) if hasattr(book, 'to') else book
         after_gnn = after_gnn.to(self.device) if hasattr(after_gnn, 'to') else after_gnn
         return (action, book, shared_info, l2_before, l2_outtake, shared_sum, l2_intake, after_gnn)

@@ -18,14 +18,14 @@ def get_args():
     parser.add_argument('--eps_decay', type=float, default=0.9999)
     parser.add_argument('--eps_min', type=float, default=0.01)
     parser.add_argument('--max_update_steps', type=int, default=3000)
-    parser.add_argument('--total_ep', type=int, default=100)
+    parser.add_argument('--total_ep', type=int, default=7)
     parser.add_argument('--book_decay', type=float, default=0.1)
     parser.add_argument("--book_term", type=int, default=4)
     parser.add_argument('--ep_save', type=int, default=1000)
     parser.add_argument('--jitter_std', type=float, default=0.5)
 
     parser.add_argument('--buffer_size', type=int, default=100000)
-    parser.add_argument('--trainstart_buffersize', type=int, default=3000)
+    parser.add_argument('--trainstart_buffersize', type=int, default=6000)
     parser.add_argument('--deque_len', type=int, default=400)
     parser.add_argument('--plot_term', type=int, default=10)
 
@@ -34,8 +34,8 @@ def get_args():
 
     parser.add_argument('--tau_predator1', type=float, default=0.2)
     parser.add_argument('--tau_predator2', type=float, default=0.2)
-    parser.add_argument('--lamda_predator1', type=float, default=0.3)
-    parser.add_argument('--lamda_predator2', type=float, default=0.7)
+    parser.add_argument('--lamda_predator1', type=float, default=0)
+    parser.add_argument('--lamda_predator2', type=float, default=0)
 
     parser.add_argument('--map_size', type=int, default=24)
     parser.add_argument('--predator1_view_range', type=int, default=10)
@@ -53,30 +53,11 @@ def get_args():
 
 args = get_args()
 wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
-wandb.run.name = 'p1:9_p2:9_36'
-# define a custom step metric so we can log our own step values (monotonic in UI)
-try:
-    wandb.define_metric("steps/step", step_metric=True)
-except Exception:
-    pass
-
-# Wrap wandb.log to automatically include our custom step metric when available
-_wandb_log = wandb.log
-def _wb_log_auto_step(d, **kwargs):
-    try:
-        if isinstance(d, dict) and "steps/step" not in d:
-            # attempt to add current step index if defined
-            d["steps/step"] = step_idx_ep
-    except Exception:
-        pass
-    return _wandb_log(d, **kwargs)
-wandb.log = _wb_log_auto_step
-
+wandb.run.name = 'test run'
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
 render_mode = 'rgb_array'
-# render_mode = 'human'
 
 predator1_view_range = args.predator1_view_range
 predator2_view_range = args.predator2_view_range
@@ -231,7 +212,6 @@ def main():
             n_agents = (args.n_predator1 + args.n_predator2 + args.n_prey)
             step_idx_ep = n_iteration // n_agents
 
-
             if (((n_iteration) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0) and (n_agents > 0):
 
                 if step_idx_ep > 0:
@@ -299,7 +279,6 @@ def main():
 
                         # If this is the first step, log them immediately (no later batch)
                         if step_idx_ep == 1:
-                            try:
                                 wandb.log({
                                     "predator1/move_count": last_move_count_pred0,
                                     "predator2/move_count": last_move_count_pred1,
@@ -307,8 +286,7 @@ def main():
                                     "predator2/tag_count": last_tag_count_pred1,
                                     "steps/step": step_idx_ep,
                                 })
-                            except Exception:
-                                pass
+
 
                         madqn.reset_step_move_count()
                         madqn.reset_step_tag_count()
@@ -433,27 +411,6 @@ def main():
                             "steps/step": step_idx_ep,
                         }
 
-                        # include the last step move/tag counts if available (fallback to current counts)
-                        try:
-                            metrics["predator1/move_count"] = last_move_count_pred0
-                            metrics["predator2/move_count"] = last_move_count_pred1
-                            metrics["predator1/tag_count"] = last_tag_count_pred0
-                            metrics["predator2/tag_count"] = last_tag_count_pred1
-                        except Exception:
-                            metrics["predator1/move_count"] = madqn.step_move_count_pred[0]
-                            metrics["predator2/move_count"] = madqn.step_move_count_pred[1]
-                            metrics["predator1/tag_count"] = madqn.step_tag_count_pred[0]
-                            metrics["predator2/tag_count"] = madqn.step_tag_count_pred[1]
-
-                        ############################################
-                        ####################???####################
-                        ############################################
-
-
-                        #########################
-                        #######Y?? ?? ??######
-                        #########################
-
                         # ? ????? ?? Observation ?? ?? predator1? ??? ??
                         for idx, value in madqn.agent_graph_overlap_pred1_deque_dict.items():
                             if len(value) == 0:
@@ -468,7 +425,6 @@ def main():
 
                         # ? ????? ?? Observation ?? ?? predator2? ??? ??
                         for idx, value in madqn.agent_graph_overlap_pred2_deque_dict.items():
-                            # ? deque? ??? ?? ??
                             last_value = value[-1]
 
                             if idx < n_predator1: # predator1 agents with predator2
@@ -479,7 +435,6 @@ def main():
 
                         # team1? view? ??? ??? intake? ??? ????? ????? ??
                         for idx, value in madqn.intake_sum_with_pred1_deque_dict.items():
-                            # ? deque? ??? ?? ??
                             last_value = value[-1]
 
                             if idx < n_predator1: # predator1 agents with predator1
@@ -490,7 +445,7 @@ def main():
 
                         # team2? view? ??? ??? intake? ??? ????? ????? ??
                         for idx, value in madqn.intake_sum_with_pred2_deque_dict.items():
-                            # ? deque? ??? ?? ??
+
                             last_value = value[-1]
 
                             if idx < n_predator1: # predator1 agents with predator2
@@ -625,11 +580,9 @@ def main():
                                 pred2_idx = idx - n_predator1
                                 metrics[f"predator2/n_prey_observation_P2_{pred2_idx}"] = last_value
 
-                        # log all batched metrics once for this step
-                        try:
-                            wandb.log(metrics)
-                        except Exception:
-                            pass
+
+                        wandb.log(metrics)
+
 
             if agent[:8] == "predator":
 
@@ -869,25 +822,66 @@ def main():
             step_idx_ep += 1
 
 
-        if madqn.buffer.size() >= args.trainstart_buffersize:
-            pred1_move = max(madqn.ep_move_count_pred[0], 1) # block Zerodivision
-            pred2_move = max(madqn.ep_move_count_pred[1], 1)
-            try:
-                wandb.log({"episode/episode": ep,
-                           "episode/total_reward": ep_reward,
-                           "episode/predator1_reward": ep_reward_pred1,
-                           "episode/predator2_reward": ep_reward_pred2,
-                           "episode/predator1_move_count": madqn.ep_move_count_pred[0],
-                           "episode/predator2_move_count": madqn.ep_move_count_pred[1],
-                           "episode/predator1_reward_over_move": ep_reward_pred1 / pred1_move,
-                           "episode/predator2_reward_over_move": ep_reward_pred2 / pred2_move,
-                           "steps/step": step_idx_ep,
-                           })
-            except Exception:
-                pass
+        pred1_move = max(madqn.ep_move_count_pred[0], 1) # block Zerodivision
+        pred2_move = max(madqn.ep_move_count_pred[1], 1)
+        try:
+            # compute team-level averages from per-agent deques (use last values when available)
+            def _team_mean(d, start, end):
+                vals = []
+                for i in range(start, end):
+                    dq = d.get(i, [])
+                    if len(dq) > 0:
+                        vals.append(dq[-1])
+                return float(np.mean(vals)) if len(vals) > 0 else float('nan')
+
+            n1 = n_predator1
+            n2 = n_predator1 + n_predator2
+
+            team_metrics = {
+                "episode/predator1_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, 0, n1),
+                "episode/predator2_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, n1, n2),
+
+                "episode/predator1_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, 0, n1),
+                "episode/predator2_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, n1, n2),
+
+                "episode/predator1_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, 0, n1),
+                "episode/predator2_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, n1, n2),
+
+                "episode/predator1_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, 0, n1),
+                "episode/predator2_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, n1, n2),
+
+                "episode/predator1_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, 0, n1),
+                "episode/predator2_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, n1, n2),
+
+                "episode/predator1_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, 0, n1),
+                "episode/predator2_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
+
+                "episode/predator1_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
+                "episode/predator2_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
+
+                "episode/predator1_mean_action": _team_mean(madqn.agent_action_deque_dict, 0, n1),
+                "episode/predator2_mean_action": _team_mean(madqn.agent_action_deque_dict, n1, n2),
+            }
+
+            log_dict = {"episode/episode": ep,
+                        "episode/total_reward": ep_reward,
+                        "episode/predator1_reward": ep_reward_pred1,
+                        "episode/predator2_reward": ep_reward_pred2,
+                        "episode/predator1_move_count": madqn.ep_move_count_pred[0],
+                        "episode/predator2_move_count": madqn.ep_move_count_pred[1],
+                        "episode/predator1_reward_over_move": ep_reward_pred1 / pred1_move,
+                        "episode/predator2_reward_over_move": ep_reward_pred2 / pred2_move,
+                        "steps/step": step_idx_ep,
+                        }
+
+            log_dict.update(team_metrics)
+
+            wandb.log(log_dict)
+        except Exception:
+            pass
 
 
-        # === 에피소드 종료 후 메모리 누수 방지: dict/list 초기화 ===
+        
         observations_dict.clear()
         reward_dict.clear()
         move_penalty_dict.clear()
