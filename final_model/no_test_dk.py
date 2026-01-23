@@ -32,10 +32,10 @@ def get_args():
     parser.add_argument('--replay_times', type=int, default=32)
     parser.add_argument('--target_update', type=int, default=10)
 
-    parser.add_argument('--tau_predator1', type=float, default=0.2)
-    parser.add_argument('--tau_predator2', type=float, default=0.2)
-    parser.add_argument('--lamda_predator1', type=float, default=0)
-    parser.add_argument('--lamda_predator2', type=float, default=0)
+    parser.add_argument('--tau_predator1', type=float, default=0.5)
+    parser.add_argument('--tau_predator2', type=float, default=0.5)
+    parser.add_argument('--lamda_predator1', type=float, default=0.3)
+    parser.add_argument('--lamda_predator2', type=float, default=0.7)
 
     parser.add_argument('--map_size', type=int, default=24)
     parser.add_argument('--predator1_view_range', type=int, default=10)
@@ -53,7 +53,7 @@ def get_args():
 
 args = get_args()
 wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
-wandb.run.name = 'test run'
+wandb.run.name = 'lamda_0.3_0.7_tau_0.5_0.5'
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -582,6 +582,60 @@ def main():
 
 
                         wandb.log(metrics)
+                        def _team_mean(d, start, end):
+                            vals = []
+                            for i in range(start, end):
+                                dq = d.get(i, [])
+                                if len(dq) > 0:
+                                    vals.append(dq[-1])
+                            return float(np.mean(vals)) if len(vals) > 0 else float('nan')
+
+                        n1 = n_predator1
+                        n2 = n_predator1 + n_predator2
+
+                        team_metrics = {
+                            "episode/predator1_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, 0, n1),
+                            "episode/predator2_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, n1, n2),
+
+                            "episode/predator1_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, 0, n1),
+                            "episode/predator2_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, n1, n2),
+
+                            "episode/predator1_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, 0, n1),
+                            "episode/predator2_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, n1, n2),
+
+                            "episode/predator1_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, 0, n1),
+                            "episode/predator2_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, n1, n2),
+
+                            "episode/predator1_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, 0, n1),
+                            "episode/predator2_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, n1, n2),
+
+                            "episode/predator1_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, 0, n1),
+                            "episode/predator2_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
+
+                            "episode/predator1_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
+                            "episode/predator2_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
+
+                            "episode/predator1_mean_action": _team_mean(madqn.agent_action_deque_dict, 0, n1),
+                            "episode/predator2_mean_action": _team_mean(madqn.agent_action_deque_dict, n1, n2),
+                        }
+
+                        pred1_move = max(madqn.ep_move_count_pred[0], 1)
+                        pred2_move = max(madqn.ep_move_count_pred[1], 1)
+
+                        log_dict = {"episode/episode": ep,
+                                    "episode/total_reward": ep_reward,
+                                    "episode/predator1_reward": ep_reward_pred1,
+                                    "episode/predator2_reward": ep_reward_pred2,
+                                    "episode/predator1_move_count": madqn.ep_move_count_pred[0],
+                                    "episode/predator2_move_count": madqn.ep_move_count_pred[1],
+                                    "episode/predator1_reward_over_move": ep_reward_pred1 / pred1_move,
+                                    "episode/predator2_reward_over_move": ep_reward_pred2 / pred2_move,
+                                    }
+
+                        log_dict.update(team_metrics)
+                        # Log episode-level metrics every 100 steps to reduce logging frequency
+                        if (step_idx_ep % 100) == 0:
+                            wandb.log(log_dict)
 
 
             if agent[:8] == "predator":
@@ -822,63 +876,7 @@ def main():
             step_idx_ep += 1
 
 
-        pred1_move = max(madqn.ep_move_count_pred[0], 1) # block Zerodivision
-        pred2_move = max(madqn.ep_move_count_pred[1], 1)
-        try:
-            # compute team-level averages from per-agent deques (use last values when available)
-            def _team_mean(d, start, end):
-                vals = []
-                for i in range(start, end):
-                    dq = d.get(i, [])
-                    if len(dq) > 0:
-                        vals.append(dq[-1])
-                return float(np.mean(vals)) if len(vals) > 0 else float('nan')
-
-            n1 = n_predator1
-            n2 = n_predator1 + n_predator2
-
-            team_metrics = {
-                "episode/predator1_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, 0, n1),
-                "episode/predator2_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, n1, n2),
-
-                "episode/predator1_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, 0, n1),
-                "episode/predator2_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, n1, n2),
-
-                "episode/predator1_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, 0, n1),
-                "episode/predator2_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, n1, n2),
-
-                "episode/predator1_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, 0, n1),
-                "episode/predator2_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, n1, n2),
-
-                "episode/predator1_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, 0, n1),
-                "episode/predator2_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, n1, n2),
-
-                "episode/predator1_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, 0, n1),
-                "episode/predator2_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
-
-                "episode/predator1_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
-                "episode/predator2_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
-
-                "episode/predator1_mean_action": _team_mean(madqn.agent_action_deque_dict, 0, n1),
-                "episode/predator2_mean_action": _team_mean(madqn.agent_action_deque_dict, n1, n2),
-            }
-
-            log_dict = {"episode/episode": ep,
-                        "episode/total_reward": ep_reward,
-                        "episode/predator1_reward": ep_reward_pred1,
-                        "episode/predator2_reward": ep_reward_pred2,
-                        "episode/predator1_move_count": madqn.ep_move_count_pred[0],
-                        "episode/predator2_move_count": madqn.ep_move_count_pred[1],
-                        "episode/predator1_reward_over_move": ep_reward_pred1 / pred1_move,
-                        "episode/predator2_reward_over_move": ep_reward_pred2 / pred2_move,
-                        "steps/step": step_idx_ep,
-                        }
-
-            log_dict.update(team_metrics)
-
-            wandb.log(log_dict)
-        except Exception:
-            pass
+        # Episode-end logging removed: episode-level metrics are logged per-step earlier.
 
 
         

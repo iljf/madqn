@@ -5,13 +5,16 @@ from torch_geometric.nn import DenseSAGEConv
 import numpy as np
 from collections import deque
 import torch.optim as optim
-from arguments import args
 import random
 
 
 class G_DQN_1(nn.Module):
-    def __init__(self,  dim_act, observation_state):
+    def __init__(self,  dim_act, observation_state, args):
         super(G_DQN_1, self).__init__()
+        if args is None:
+            raise ArgsMissingError("G_DQN_1 requires args to be passed")
+
+        self.args = args
         self.eps_decay = args.eps_decay
 
         self.observation_state = observation_state
@@ -22,7 +25,7 @@ class G_DQN_1(nn.Module):
         self.dim_feature = observation_state[2]
         self.gnn1 = DenseSAGEConv(self.dim_feature, 128)
         self.gnn2 = DenseSAGEConv(128, 32)
-        self.sig = nn.Sigmoid() #sigmoid ? ??? ?? ??..
+        self.sig = nn.Sigmoid()
 
         #DQN
         self.dim_input = ((args.predator1_view_range *2)**2)*32
@@ -64,8 +67,12 @@ class G_DQN_1(nn.Module):
         return x
 
 class G_DQN_2(nn.Module):
-    def __init__(self,  dim_act, observation_state):
+    def __init__(self,  dim_act, observation_state, args):
         super(G_DQN_2, self).__init__()
+        if args is None:
+            raise ArgsMissingError("G_DQN_2 requires args to be passed")
+
+        self.args = args
         self.eps_decay = args.eps_decay
 
         self.observation_state = observation_state
@@ -76,7 +83,7 @@ class G_DQN_2(nn.Module):
         self.dim_feature = observation_state[2]
         self.gnn1 = DenseSAGEConv(self.dim_feature, 128)
         self.gnn2 = DenseSAGEConv(128, 32)
-        self.sig = nn.Sigmoid() #sigmoid ? ??? ?? ??..
+        self.sig = nn.Sigmoid()
 
         #DQN
         self.dim_input = ((args.predator2_view_range *2)**2)*32
@@ -118,21 +125,21 @@ class G_DQN_2(nn.Module):
 
 
 class ReplayBuffer:
-   def __init__(self, capacity=args.buffer_size):
-      self.buffer = deque(maxlen=capacity)
+    def __init__(self, capacity):
+        self.buffer = deque(maxlen=capacity)
 
-   def put(self, observation , action , reward, next_observation, termination, truncation):
+    def put(self, observation , action , reward, next_observation, termination, truncation):
        self.buffer.append([observation, action , reward, next_observation, termination, truncation])
 
 
 
-   def sample(self):
+    def sample(self):
        sample = random.sample(self.buffer, 1)
 
        observation, action , reward, next_observation, termination, truncation = zip(*sample)
        return observation, action , reward, next_observation, termination, truncation
 
-   def size(self):
+    def size(self):
       return len(self.buffer)
 
 

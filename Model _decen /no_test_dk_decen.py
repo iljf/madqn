@@ -1,3 +1,4 @@
+# parse args locally so this script can be run standalone
 from magent2_backup.environments import hetero_adversarial_v1
 from MADQN_decen import MADQN
 import argparse
@@ -6,16 +7,50 @@ import torch as th
 import wandb
 import os
 
-from arguments import args
+
+def get_args():
+    parser = argparse.ArgumentParser(description='MADQN_decen')
+    parser.add_argument('--dim_feature', type=int, default=3)
+    parser.add_argument('--gamma', type=float, default=0.95)
+    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--eps', type=float, default=1)
+    parser.add_argument('--eps_decay', type=float, default=0.9999)
+    parser.add_argument('--eps_min', type=float, default=0.01)
+    parser.add_argument('--max_update_steps', type=int, default=3000)
+    parser.add_argument('--total_ep', type=int, default=7)
+    parser.add_argument('--book_decay', type=float, default=0.1)
+    parser.add_argument('--book_term', type=int, default=4)
+    parser.add_argument('--ep_save', type=int, default=1000)
+    parser.add_argument('--jitter_std', type=float, default=0.5)
+    parser.add_argument('--buffer_size', type=int, default=100000)
+    parser.add_argument('--trainstart_buffersize', type=int, default=6000)
+    parser.add_argument('--deque_len', type=int, default=400)
+    parser.add_argument('--plot_term', type=int, default=10)
+    parser.add_argument('--replay_times', type=int, default=32)
+    parser.add_argument('--target_update', type=int, default=10)
+    parser.add_argument('--map_size', type=int, default=24)
+    parser.add_argument('--predator1_view_range', type=int, default=10)
+    parser.add_argument('--predator2_view_range', type=int, default=5)
+    parser.add_argument('--n_predator1', type=int, default=9)
+    parser.add_argument('--n_predator2', type=int, default=9)
+    parser.add_argument('--n_prey', type=int, default=36)
+    parser.add_argument('--tag_reward', type=float, default=3)
+    parser.add_argument('--tag_penalty', type=float, default=-0.2)
+    parser.add_argument('--move_penalty', type=float, default=-0.15)
+    parser.add_argument('--seed', type=int, default=2000)
+
+    return parser.parse_args()
 
 
-device = 'cpu'
+args = get_args()
 
-# wandb.init(project="MADQN", entity='hails',config=args.__dict__)
-# wandb.run.name = 'revision_gnn_8'
+device = th.device("cuda" if th.cuda.is_available() else "cpu")
+
+wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
+wandb.run.name = 'model_decen'
 
 render_mode = 'rgb_array'
-#render_mode = 'human'
+
 #env = hetero_adversarial_v1.env(map_size=args.map_size, minimap_mode=False, tag_penalty=-0.2,
 # max_cycles=args.max_update_steps, extra_features=False,render_mode=render_mode)
 
@@ -26,31 +61,30 @@ n_predator2 = args.n_predator2
 n_prey = args.n_prey
 
 
-predator1_obs = (predator1_view_range*2,predator1_view_range*2, 3)
+predator1_obs = (predator1_view_range*2,predator1_view_range*2, 3) # TODO: 여기 dim feature 이 왜 3임?
 predator2_obs = (predator2_view_range*2,predator2_view_range*2, 3)
 dim_act = 13
 
-predator1_adj = ((predator1_view_range*2)**2, (predator1_view_range*2)**2)
+predator1_adj = ((predator1_view_range*2)**2, (predator1_view_range*2)**2) # TODO: 왜 **2 한지 이유를 모르겠음
 predator2_adj = ((predator2_view_range*2)**2, (predator2_view_range*2)**2)
 
 batch_size = 1
 
-target_update_point = (1+args.max_update_steps)*(args.n_predator1+args.n_predator2+args.n_prey)
+# target_update_point = (1+args.max_update_steps)*(args.n_predator1+args.n_predator2+args.n_prey)
+# TODO: 여기 왜 있는거임? 
 
 
+madqn = MADQN(n_predator1, n_predator2, predator1_obs, predator2_obs, dim_act, args.buffer_size, device, args=args)
 
-madqn = MADQN(n_predator1, n_predator2, predator1_obs, predator2_obs, dim_act, args.buffer_size, device)
-
-
-def process_array_1(arr):  #predator1 (obs, ??, ??hp, predator2, predator2 hp, prey, prey hp)
-    arr = np.delete(arr, [2, 4, 6], axis=2)
+def process_array_1(arr):  #predator1 (obs, team, team hp, predator2, predator2 hp, prey, prey hp)
+    arr = np.delete(arr, [2, 4, 6], axis=2) # team, predator2, 
     combined_dim = np.logical_or(arr[:, :, 1], arr[:, :, 2])
     result = np.dstack((arr[:, :, 0], combined_dim, arr[:, :, 3]))
 
     return result
 
 
-def process_array_2(arr): #predator2 (obs, ??, ??hp, prey, prey hp, predator2, predator2 hp)
+def process_array_2(arr): #predator2 (obs, team, team hp, prey, prey hp, predator2, predator2 hp)
     arr = np.delete(arr, [2, 4, 6], axis=2)
     combined_dim = np.logical_or(arr[:, :, 1], arr[:, :, 3])
     result = np.dstack((arr[:, :, 0], combined_dim, arr[:, :, 2]))
@@ -58,15 +92,12 @@ def process_array_2(arr): #predator2 (obs, ??, ??hp, prey, prey hp, predator2, p
     return result
 
 
-
-
-
 def main():
 
     for ep in range(args.total_ep):
 
         ep_reward = 0
-        iteration_number = 0
+        n_iteration = 0
 
         observations_dict = {}
         for agent_idx in range(n_predator1 + n_predator2):
@@ -98,18 +129,14 @@ def main():
 
         for agent in env.agent_iter():
 
-            step_idx = iteration_number // (args.n_predator1 + args.n_predator2 + args.n_prey)
+            n_agents = (args.n_predator1 + args.n_predator2 + args.n_prey)
+            step_idx_ep = n_iteration // n_agents
 
             if agent[:8] == "predator":
-
                 # handles = env.env.env.env.env.get_handles()
                 # pos_predator1 = env.env.env.env.env.get_pos(handles[0])
                 # pos_predator2 = env.env.env.env.env.get_pos(handles[1])
-
-
                 observation, reward, termination, truncation, info = env.last()
-
-
 
                 if agent[9] == "1":
                     idx = int(agent[11:])
@@ -119,7 +146,6 @@ def main():
                     observation_temp = process_array_2(observation)
 
                 madqn.set_agent_info(agent)
-
 
                 if termination or truncation:
                     print(agent , 'is terminated')
@@ -158,7 +184,7 @@ def main():
                     env.step(action)
 
 
-            if ((((iteration_number + 1) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0)
+            if ((((n_iteration + 1) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0)
                     and step_idx > 0):
 
                 total_last_rewards = 0
@@ -194,7 +220,7 @@ def main():
                 #     wandb.log({"shared_mean": madqn.shared.mean()})
                 #     wandb.log({"shared_std": madqn.shared.std()})
 
-            iteration_number += 1
+            n_iteration += 1
 
         # if madqn.buffer.size() >= args.trainstart_buffersize:
         #     wandb.log({"ep_reward": ep_reward})
@@ -202,7 +228,7 @@ def main():
 
         if ep > args.total_ep: #100
             print('*' * 10, 'train over', '*' * 10)
-            print(iteration_number)
+            print(n_iteration)
             break
 
 

@@ -4,40 +4,35 @@ import random
 import torch
 import torch.nn as nn
 from torch.optim import Adam
-from arguments import args
 
 dim_act = 13
-n_predator1 = args.n_predator1
-n_predator2 = args.n_predator2
-
-predator1_view_range = args.map_size
-predator2_view_range = args.map_size
-
-predator1_adj = ((predator1_view_range)**2,(predator1_view_range)**2)
-predator2_adj = ((predator2_view_range)**2,(predator2_view_range)**2)
 
 
 class MADQN():  # def __init__(self,  dim_act, observation_state):
-    def __init__(self, n_predator1, n_predator2, dim_act , entire_state , device = 'cpu', buffer_size = args.buffer_size):
+    def __init__(self, n_predator1, n_predator2, dim_act, entire_state, device='cpu', buffer_size=10000, args=None):
         self.entire_state = entire_state
         self.n_predator1 = n_predator1
         self.n_predator2 = n_predator2
         self.dim_act = dim_act
-        self.epsilon = args.eps
-        self.eps_decay = args.eps_decay
         self.device = device
+        self.args = args
 
+        # initialize epsilon
+        self.epsilon = self.args.eps
 
-        self.gdqns = [G_DQN(self.dim_act, self.entire_state).to(self.device) for _ in range(self.n_predator1 + n_predator2)]
-        self.gdqn_targets = [G_DQN(self.dim_act, self.entire_state).to(self.device) for _ in
-                      range(self.n_predator1 + n_predator2)]
+        # adjacency sizes based on view ranges
+        pred1_view = self.args.predator1_view_range
+        pred2_view = self.args.predator2_view_range
+        self.predator1_adj = ((pred1_view) ** 2, (pred1_view) ** 2)
+        self.predator2_adj = ((pred2_view) ** 2, (pred2_view) ** 2)
 
-        #50000만개
+        self.gdqns = [G_DQN(self.dim_act, self.entire_state).to(self.device) for _ in range(self.n_predator1 + self.n_predator2)]
+        self.gdqn_targets = [G_DQN(self.dim_act, self.entire_state).to(self.device) for _ in range(self.n_predator1 + self.n_predator2)]
+
         self.buffers = [G_ReplayBuffer(capacity=buffer_size) for _ in range(self.n_predator1 + self.n_predator2)]
-        self.gdqn_optimizers = [Adam(x.parameters(), lr=args.lr) for x in self.gdqns]
+        self.gdqn_optimizers = [Adam(x.parameters(), lr=(self.args.lr if self.args is not None else 0.001)) for x in self.gdqns]
 
         self.criterion = nn.MSELoss()
-
 
         self.adj = None
         self.idx = None
@@ -46,8 +41,6 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         self.gdqn_target = None
 
         self.gdqn_optimizer = None
-        #self.target_optimizer = None #사실상 필요 없음...어차피 gdqn_optimizer 것을 물려받는 것이므로!
-
         self.buffer = None
 
 
@@ -55,7 +48,7 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
     def target_update(self):
 
-        for i in range(args.n_predator1 + args.n_predator2) :
+        for i in range(self.n_predator1 + self.n_predator2):
             weights = self.gdqns[i].state_dict()
             self.gdqn_targets[i].load_state_dict(weights)
 
@@ -70,12 +63,10 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
         if agent[9] == "1":
             self.idx = int(agent[11:])
-            self.adj = torch.ones(predator1_adj)
-
-
+            self.adj = torch.ones(self.predator1_adj)
         else:
-            self.idx = int(agent[11:]) + n_predator1
-            self.adj = torch.ones(predator2_adj)
+            self.idx = int(agent[11:]) + self.n_predator1
+            self.adj = torch.ones(self.predator2_adj)
 
 
 
@@ -94,30 +85,26 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         q_value = self.gdqn(torch.tensor(state).to(self.device), self.adj.to(self.device))
 
 
-        self.epsilon *= args.eps_decay
-        self.epsilon = max(self.epsilon, args.eps_min)
+        if self.args is not None:
+            self.epsilon *= self.args.eps_decay
+            self.epsilon = max(self.epsilon, self.args.eps_min)
 
         if np.random.random() < self.epsilon:
             return random.randint(0, self.dim_act - 1)
         return torch.argmax(q_value).item()
 
-
-        try:
-            torch.cuda.empty_cache()
-        except:
-            pass
-
     def replay(self):
-        for _ in range(args.replay_times):
+        for _ in range(self.args.replay_times if self.args is not None else 1):
             self.gdqn_optimizer.zero_grad()
 
-            observations,  actions, rewards, next_observations, termination, truncation = self.buffer.sample()
+            observations, actions, rewards, next_observations, termination, truncation = self.buffer.sample()
 
             next_observations = torch.tensor(next_observations)
             observations = torch.tensor(observations)
 
-            next_observations = next_observations.reshape(-1,args.dim_feature)
-            observations = observations.reshape(-1,args.dim_feature)
+            dim_feat = self.args.dim_feature if self.args is not None else 1
+            next_observations = next_observations.reshape(-1, dim_feat)
+            observations = observations.reshape(-1, dim_feat)
 
 
             # to device
@@ -132,11 +119,10 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
             next_q_values = self.gdqn_target(next_observations.unsqueeze(0), adj.unsqueeze(0))
             next_q_values = torch.max(next_q_values)
 
-            targets = int(rewards[0]) + (1 - int(termination[0])) * next_q_values * args.gamma
+            gamma = self.args.gamma if self.args is not None else 0.95
+            targets = int(rewards[0]) + (1 - int(termination[0])) * next_q_values * gamma
             loss = self.criterion(q_values, targets.detach())
-            #loss.backward(retain_graph=True)
             loss.backward()
-            #loss.backward()
             self.gdqn_optimizer.step()
 
 

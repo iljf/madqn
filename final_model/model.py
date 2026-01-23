@@ -52,7 +52,7 @@ class G_DQN(nn.Module):
         else:
             info = info.float()
 
-        # observation and info reshape to batched node features: [batch=1, num_nodes, in_channels]
+        
         H, W, C = self.observation_state
         num_nodes = H * W
         x_pre = x.reshape(num_nodes, C).unsqueeze(0)      # [1, num_nodes, C]
@@ -79,7 +79,7 @@ class G_DQN(nn.Module):
         x2 = x2.squeeze(0).reshape(H, W, C)
 
         # ---- DQN (concatenate channels) ----
-        q_input = torch.cat((x1, x2), dim=2)          # [H, W, 2*C]
+        q_input = torch.cat((x1, x2), dim=-1)          # [H, W, 2*C]
         Q_t = q_input.reshape(1, -1)                  # [1, dim_input]
         x3 = self.FC1(Q_t)
         x3 = self.tanh(x3)
@@ -96,7 +96,8 @@ class G_DQN(nn.Module):
         shared1 = x2_2.reshape(H, W, C)
 
         # L2 norms for outtake ratio
-        l2_before = torch.norm(x)
+        # l2_before = torch.norm(x)
+        l2_before = torch.norm(x1) # diff ratio of before gate and after gate
         l2_outtake = torch.norm(shared1)
         outtake_ratio = l2_outtake / (l2_before + 1e-8)
         shared_sum = torch.mean(shared1)

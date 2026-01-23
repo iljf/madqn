@@ -5,9 +5,7 @@ from torch_geometric.nn import DenseSAGEConv
 import numpy as np
 from collections import deque
 import torch.optim as optim
-from arguments import args
 import random
-import arguments
 
 class G_DQN(nn.Module):
     def __init__(self,  dim_act, observation_state):

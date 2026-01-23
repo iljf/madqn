@@ -1,31 +1,75 @@
 from magent2_backup.environments import hetero_adversarial_v1
 from MADQN_cen import MADQN
-from arguments import args
+import argparse
 import torch as th
 import wandb
 import tqdm
 import numpy as np
+import os
 
-seed = 2000
+def get_args():
+	parser = argparse.ArgumentParser(description='MADQN_cen')
 
-device = 'cpu'
+	parser.add_argument('--dim_feature', type=int, default=4)
+	parser.add_argument('--gamma', type=float, default=0.95)
+	parser.add_argument('--lr', type=float, default=0.001)
+	parser.add_argument('--eps', type=float, default=1)
+	parser.add_argument('--eps_decay', type=float, default=0.9999)
+	parser.add_argument('--eps_min', type=float, default=0.01)
+	parser.add_argument('--max_update_steps', type=int, default=3000)
+	parser.add_argument('--total_ep', type=int, default=7)
+	parser.add_argument('--book_decay', type=float, default=0.1)
+	parser.add_argument('--book_term', type=int, default=4)
+	parser.add_argument('--ep_save', type=int, default=1000)
+	parser.add_argument('--jitter_std', type=float, default=0.5)
 
-# wandb.init(project="MADQN", entity='hails',config=args.__dict__)
-# wandb.run.name = 'cen_move_penalty_6'
+	parser.add_argument('--buffer_size', type=int, default=100000)
+	parser.add_argument('--trainstart_buffersize', type=int, default=6000)
+	parser.add_argument('--deque_len', type=int, default=400)
+	parser.add_argument('--plot_term', type=int, default=10)
 
+	parser.add_argument('--replay_times', type=int, default=32)
+	parser.add_argument('--target_update', type=int, default=10)
+
+	parser.add_argument('--tau_predator1', type=float, default=0.2)
+	parser.add_argument('--tau_predator2', type=float, default=0.2)
+	parser.add_argument('--lamda_predator1', type=float, default=0)
+	parser.add_argument('--lamda_predator2', type=float, default=0)
+
+	parser.add_argument('--map_size', type=int, default=24)
+	parser.add_argument('--predator1_view_range', type=int, default=10)
+	parser.add_argument('--predator2_view_range', type=int, default=5)
+	parser.add_argument('--n_predator1', type=int, default=9)
+	parser.add_argument('--n_predator2', type=int, default=9)
+	parser.add_argument('--n_prey', type=int, default=36)
+	parser.add_argument('--tag_reward', type=float, default=3)
+	parser.add_argument('--tag_penalty', type=float, default=-0.2)
+	parser.add_argument('--move_penalty', type=float, default=-0.15)
+
+	parser.add_argument('--seed', type=int, default=125)
+
+	return parser.parse_args()
+
+
+args = get_args()
+
+wandb.init(project="MADQN_cen", entity='hails',config=args.__dict__)
+wandb.run.name = 'madqn_centralized'
+
+device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
 render_mode = 'rgb_array'
-# render_mode = "human"
 
 entire_state = (args.map_size,args.map_size,args.dim_feature)
 dim_act = 13
+
 n_predator1 = args.n_predator1
-n_predator2 = args.n_predator1
+n_predator2 = args.n_predator2
 n_prey = args.n_prey
 
 
 
-madqn = MADQN(n_predator1, n_predator2, dim_act ,entire_state, device, buffer_size=args.buffer_size)
+madqn = MADQN(n_predator1, n_predator2, dim_act, entire_state, device=device, buffer_size=args.buffer_size, args=args)
 
 # for i in range(n_predator1 + n_predator2):
 # 	madqn.gdqns[i].load_state_dict(th.load(f'./model_cen_save/model_{i}_ep50.pt'))
@@ -37,8 +81,6 @@ madqn = MADQN(n_predator1, n_predator2, dim_act ,entire_state, device, buffer_si
 		#
 		# # ?? ?? ??? ?? ??? ??
 		# madqn.gdqns[i].load_state_dict(model_state_dict)
-
-
 
 def process_array(arr):  #predator1 (obs, team, team_hp, predator2, predator2 hp, prey, prey hp)
 
@@ -64,7 +106,7 @@ def main():
 
 	for ep in range(args.total_ep):
 
-		iteration_number = 0  #ep? ?? ?????? 0 ?? ???
+		iteration_number = 0
 		ep_reward = 0
 
 		env = hetero_adversarial_v1.env(map_size=args.map_size, minimap_mode=False, tag_penalty=args.tag_penalty,
@@ -98,18 +140,16 @@ def main():
 		for agent_idx in range(n_predator1 + n_predator2):
 			truncation_dict[agent_idx] = []
 
-
-		# 'max_update_steps' ??? ??? ?? ?????.
 		for agent in env.agent_iter():
 
 			step_idx = iteration_number // (args.n_predator1 + args.n_predator2 + args.n_prey)
-			# print(agent[:8]=='predator')
 
 			if (((iteration_number) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0
 					and step_idx > 1 and step_idx != args.max_update_steps):
 
 				total_last_rewards = 0
 				total_move_penalty = 0
+
 				for agent_rewards in reward_dict.values():
 					total_last_rewards += np.sum(agent_rewards[-1])
 
@@ -120,8 +160,6 @@ def main():
 
 				ep_reward += total_last_rewards
 
-
-				#??? put
 				for idx in range(args.n_predator1 + args.n_predator2):
 
 					# madqn.set_agent_info(agent, pos, view_range)
