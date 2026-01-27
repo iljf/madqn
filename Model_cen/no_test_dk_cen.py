@@ -90,15 +90,25 @@ def process_array(arr):  #predator1 (obs, team, team_hp, predator2, predator2 hp
 	pos_list1 = np.argwhere(result[:, :, 1] == 1)
 	pos_list2 = np.argwhere(result[:, :, 2] == 1)
 
+	H, W, _ = result.shape
+
 	for i in pos_list1:
-		result[i[0] + 1, i[1], 1] = 1
-		result[i[0], i[1] + 1, 1] = 1
-		result[i[0] + 1, i[1] + 1, 1] = 1
+		r, c = int(i[0]), int(i[1])
+		if r + 1 < H:
+			result[r + 1, c, 1] = 1
+		if c + 1 < W:
+			result[r, c + 1, 1] = 1
+		if (r + 1 < H) and (c + 1 < W):
+			result[r + 1, c + 1, 1] = 1
 
 	for i in pos_list2:
-		result[i[0] + 1, i[1], 2] = 1
-		result[i[0], i[1] + 1, 2] = 1
-		result[i[0] + 1, i[1] + 1, 2] = 1
+		r, c = int(i[0]), int(i[1])
+		if r + 1 < H:
+			result[r + 1, c, 2] = 1
+		if c + 1 < W:
+			result[r, c + 1, 2] = 1
+		if (r + 1 < H) and (c + 1 < W):
+			result[r + 1, c + 1, 2] = 1
 
 	return result
 
@@ -110,7 +120,14 @@ def main():
 		ep_reward = 0
 
 		env = hetero_adversarial_v1.env(map_size=args.map_size, minimap_mode=False, tag_penalty=args.tag_penalty,
-										max_cycles=args.max_update_steps, extra_features=False, render_mode=render_mode)
+									max_cycles=args.max_update_steps, extra_features=False, render_mode=render_mode,
+									predator1_view_range=args.predator1_view_range,
+									predator2_view_range=args.predator2_view_range,
+									n_predator1=args.n_predator1,
+									n_predator2=args.n_predator2,
+									n_prey=args.n_prey,
+									tag_reward=args.tag_reward,
+									)
 
 		env.reset(seed=args.seed)
 		print("ep:",ep,'*' * 80)

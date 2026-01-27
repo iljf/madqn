@@ -24,7 +24,6 @@ class G_DQN(nn.Module):
 
         #DQN
         self.dim_input = self.observation_state[0] * self.observation_state[1] * self.observation_state[2]
-        print(self.dim_input)
         self.FC1 = nn.Linear(self.dim_input, 64)
         self.FC2 = nn.Linear(64, dim_act)
         # self.relu = nn.ReLU(inplace=True)
@@ -33,26 +32,42 @@ class G_DQN(nn.Module):
 
     def forward(self, x, adj): #info 는 필요 없음
 
-        try:
-            torch.cuda.empty_cache()
-        except:
-            pass
-
-
         if isinstance(x, np.ndarray):
-            x = torch.tensor(x).float()
+            x = torch.tensor(x, dtype=torch.float32)
         else:
-            pass
+            x = x.float()
 
-        x = self.gnn1(x.reshape(-1, self.dim_feature), adj)
-        x = F.elu(self.gnn2(x,adj)).squeeze()
+        H, W, C = self.observation_state
+        num_nodes = H * W
 
-        x = x.reshape(-1, self.dim_input)
+        # normalize input to [B, N, C]
+        if x.dim() == 3:
+            x_b = x.reshape(num_nodes, C).unsqueeze(0)
+        elif x.dim() == 4:
+            x_b = x.reshape(-1, num_nodes, C)
+        else:
+            # fallback for already-flattened input
+            x_b = x.reshape(-1, num_nodes, C)
 
-        x = self.FC1(x)
-        x = self.FC2(x)
+        # ensure adj has batch dimension [B, N, N]
+        if adj.dim() == 2:
+            adj_b = adj.unsqueeze(0)
+        else:
+            adj_b = adj
 
-        return x
+        x1 = self.gnn1(x_b, adj_b)
+        x1 = F.elu(x1)
+        x1 = self.gnn2(x1, adj_b)
+        x1 = F.elu(x1)
+
+        x2 = x1.reshape(x1.size(0), -1)  # [B, dim_input]
+        x2 = self.relu(self.FC1(x2))
+        q = self.FC2(x2)
+
+        # most call sites use batch size 1
+        if q.size(0) == 1:
+            return q.squeeze(0)
+        return q
 
 
 

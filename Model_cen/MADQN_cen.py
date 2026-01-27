@@ -20,11 +20,8 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         # initialize epsilon
         self.epsilon = self.args.eps
 
-        # adjacency sizes based on view ranges
-        pred1_view = self.args.predator1_view_range
-        pred2_view = self.args.predator2_view_range
-        self.predator1_adj = ((pred1_view) ** 2, (pred1_view) ** 2)
-        self.predator2_adj = ((pred2_view) ** 2, (pred2_view) ** 2)
+        # Graph adjacency must match H*W nodes of entire_state.
+        self.global_adj = torch.tensor(self.king_adj(self.entire_state[0])).float()
 
         self.gdqns = [G_DQN(self.dim_act, self.entire_state).to(self.device) for _ in range(self.n_predator1 + self.n_predator2)]
         self.gdqn_targets = [G_DQN(self.dim_act, self.entire_state).to(self.device) for _ in range(self.n_predator1 + self.n_predator2)]
@@ -42,6 +39,71 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
         self.gdqn_optimizer = None
         self.buffer = None
+
+
+    def king_adj(self, n: int):
+        """King-move adjacency on an n x n grid (8-neighborhood + self-loop)."""
+        A = np.zeros((n ** 2, n ** 2), dtype=np.float32)
+
+        for i in range(n ** 2):
+            if i // n == 0:
+                if i % n == 0:
+                    A[i, i + 1] = 1
+                    A[i, i + n] = 1
+                    A[i, i + 1 + n] = 1
+                elif i % n == n - 1:
+                    A[i, i - 1] = 1
+                    A[i, i - 1 + n] = 1
+                    A[i, i + n] = 1
+                else:
+                    A[i, i - 1] = 1
+                    A[i, i + 1] = 1
+                    A[i, i - 1 + n] = 1
+                    A[i, i + n] = 1
+                    A[i, i + 1 + n] = 1
+
+            elif i // n == n - 1:
+                if i % n == 0:
+                    A[i, i - n] = 1
+                    A[i, i + 1 - n] = 1
+                    A[i, i + 1] = 1
+                elif i % n == n - 1:
+                    A[i, i - n] = 1
+                    A[i, i - 1 - n] = 1
+                    A[i, i - 1] = 1
+                else:
+                    A[i, i - 1] = 1
+                    A[i, i + 1] = 1
+                    A[i, i - 1 - n] = 1
+                    A[i, i - n] = 1
+                    A[i, i + 1 - n] = 1
+
+            else:
+                if i % n == 0:
+                    A[i, i - n] = 1
+                    A[i, i + 1 - n] = 1
+                    A[i, i + 1] = 1
+                    A[i, i + n] = 1
+                    A[i, i + 1 + n] = 1
+                elif i % n == n - 1:
+                    A[i, i - 1 - n] = 1
+                    A[i, i - n] = 1
+                    A[i, i - 1] = 1
+                    A[i, i - 1 + n] = 1
+                    A[i, i + n] = 1
+                else:
+                    A[i, i - 1 - n] = 1
+                    A[i, i - n] = 1
+                    A[i, i + 1 - n] = 1
+                    A[i, i - 1] = 1
+                    A[i, i + 1] = 1
+                    A[i, i - 1 + n] = 1
+                    A[i, i + n] = 1
+                    A[i, i + 1 + n] = 1
+
+        for i in range(n ** 2):
+            A[i, i] = 1
+        return A
 
 
 
@@ -63,10 +125,11 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
         if agent[9] == "1":
             self.idx = int(agent[11:])
-            self.adj = torch.ones(self.predator1_adj)
         else:
             self.idx = int(agent[11:]) + self.n_predator1
-            self.adj = torch.ones(self.predator2_adj)
+
+        # same global adjacency for all agents in centralized setting
+        self.adj = self.global_adj
 
 
 
@@ -82,7 +145,9 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
     def get_action(self, state, mask=None):
 
-        q_value = self.gdqn(torch.tensor(state).to(self.device), self.adj.to(self.device))
+        state_t = torch.as_tensor(state, dtype=torch.float32, device=self.device)
+        adj_t = self.adj.to(self.device)
+        q_value = self.gdqn(state_t, adj_t)
 
 
         if self.args is not None:
@@ -99,34 +164,26 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
             observations, actions, rewards, next_observations, termination, truncation = self.buffer.sample()
 
-            next_observations = torch.tensor(next_observations)
-            observations = torch.tensor(observations)
+            obs = torch.as_tensor(observations[0], dtype=torch.float32, device=self.device)
+            next_obs = torch.as_tensor(next_observations[0], dtype=torch.float32, device=self.device)
+            action = int(actions[0])
+            reward = float(rewards[0])
+            done = bool(termination[0]) or bool(truncation[0])
 
-            dim_feat = self.args.dim_feature if self.args is not None else 1
-            next_observations = next_observations.reshape(-1, dim_feat)
-            observations = observations.reshape(-1, dim_feat)
-
-
-            # to device
-            observations = observations.to(self.device)
-            next_observations = next_observations.to(self.device)
             adj = self.adj.to(self.device)
 
-            q_values = self.gdqn(observations.unsqueeze(0), adj.unsqueeze(0))
-            q_values = q_values[0][actions]
+            q_all = self.gdqn(obs, adj)                  # [dim_act]
+            q_val = q_all[action]
 
-
-            next_q_values = self.gdqn_target(next_observations.unsqueeze(0), adj.unsqueeze(0))
-            next_q_values = torch.max(next_q_values)
+            next_q_all = self.gdqn_target(next_obs, adj)  # [dim_act]
+            next_q_max = torch.max(next_q_all)
 
             gamma = self.args.gamma if self.args is not None else 0.95
-            targets = int(rewards[0]) + (1 - int(termination[0])) * next_q_values * gamma
-            loss = self.criterion(q_values, targets.detach())
+            target = torch.tensor(reward, dtype=torch.float32, device=self.device)
+            if not done:
+                target = target + next_q_max * gamma
+
+            loss = self.criterion(q_val, target.detach())
             loss.backward()
             self.gdqn_optimizer.step()
 
-
-            try:
-                torch.cuda.empty_cache()
-            except:
-                pass
