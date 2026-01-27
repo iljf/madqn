@@ -133,6 +133,15 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         for agent_idx in range(n_predator1 + n_predator2):
             self.l2_outtake_deque_dict[agent_idx] = deque(maxlen=args.deque_len)
 
+        # outtake ratio & gate mean (for team-level logging)
+        self.outtake_ratio_deque_dict = {}
+        for agent_idx in range(n_predator1 + n_predator2):
+            self.outtake_ratio_deque_dict[agent_idx] = deque(maxlen=args.deque_len)
+
+        self.gate_mean_deque_dict = {}
+        for agent_idx in range(n_predator1 + n_predator2):
+            self.gate_mean_deque_dict[agent_idx] = deque(maxlen=args.deque_len)
+
         # in take
 
         self.l2_intake_deque_dict = {}
@@ -743,16 +752,8 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         book = self.from_guestbook()
 
         # G_DQN forward
-        q_value, shared1, l2_before, l2_outtake, shared_sum, l2_intake, after_gnn, outtake_ratio = self.gdqn(
+        q_value, shared1, l2_before, l2_outtake, shared_sum, l2_intake, after_gnn, outtake_ratio, gate_mean = self.gdqn(
             torch.tensor(state).to(self.device), self.adj.to(self.device), book.to(self.device))
-        
-        shared_info = shared1.detach()
-        l2_before = l2_before.detach()
-        l2_outtake = l2_outtake.detach()
-        shared_sum = shared_sum.detach()
-        l2_intake = l2_intake.detach()
-        after_gnn = after_gnn.detach()
-        outtake_ratio = outtake_ratio.detach()
 
         self.epsilon *= self.eps_decay
 
@@ -766,6 +767,22 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         # detached info to guestbook
         self.to_guestbook(shared1.detach())
 
+        # store scalars for later team-mean logging
+        try:
+            outtake_ratio_val = float(outtake_ratio.detach().cpu().item())
+        except Exception:
+            outtake_ratio_val = float(outtake_ratio)
+
+        try:
+            gate_mean_val = float(gate_mean.detach().cpu().item())
+        except Exception:
+            gate_mean_val = float(gate_mean)
+
+        if self.idx is not None:
+            self.outtake_ratio_deque_dict[self.idx].append(outtake_ratio_val)
+            self.gate_mean_deque_dict[self.idx].append(gate_mean_val)
+
+        shared_info = shared1
         
         book = book.to(self.device) if hasattr(book, 'to') else book
         after_gnn = after_gnn.to(self.device) if hasattr(after_gnn, 'to') else after_gnn
@@ -792,12 +809,12 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
             adj = self.adj.to(self.device)
 
             # ---- Q vlaue ----
-            q_values, _,_,_,_,_,_,outtake_ratio = self.gdqn(obs, adj, book)
+            q_values, _,_,_,_,_,_,_, gate_mean = self.gdqn(obs, adj, book)
             q_value = q_values[action] 
 
             # ---- Target Q value ----
             with torch.no_grad():
-                next_q_values, _,_,_,_,_,_,_ = self.gdqn_target(next_obs, adj, book_next)
+                next_q_values, _,_,_,_,_,_,_,_ = self.gdqn_target(next_obs, adj, book_next)
                 next_q_value = torch.max(next_q_values)
 
                 target_q = rewards + (1 - int(done)) * next_q_value * self.gamma
@@ -813,8 +830,8 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
                 lamda = self.lamda_predator2
 
             # ---- outtake loss ----
-            loss_outtake = (outtake_ratio - tau) ** 2
-            loss = loss_td + lamda * loss_outtake
+            loss_b = (gate_mean - tau) ** 2
+            loss = loss_td + lamda * loss_b
             loss.backward()
             self.gdqn_optimizer.step()
 

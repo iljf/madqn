@@ -86,13 +86,10 @@ class G_DQN(nn.Module):
         x3 = self.FC2(x3).squeeze(0)                  # [dim_act]
 
         # ---- Book outtake ----
-        x1_det = x1.detach()                          # [H, W, C]
-        Q_det = q_input.detach()
-
-        x2_1 = self.out_linear(Q_det)
+        x2_1 = self.out_linear(q_input.detach())
         gate = self.sigmoid(self.gate_net(x2_1))      # gate shape [H, W, C]
 
-        x2_2 = x1_det * gate
+        x2_2 = x1.detach() * gate
         shared1 = x2_2.reshape(H, W, C)
 
         # L2 norms for outtake ratio
@@ -100,11 +97,17 @@ class G_DQN(nn.Module):
         l2_before = torch.norm(x1) # diff ratio of before gate and after gate
         l2_outtake = torch.norm(shared1)
         outtake_ratio = l2_outtake / (l2_before + 1e-8)
+
+        
         shared_sum = torch.mean(shared1)
+        gate_mean = torch.mean(gate)
 
-        l2_intake = torch.norm(x2) / (torch.norm(info) + 1e-8)
+        denom_info = torch.norm(info)
+        l2_intake = torch.norm(x2) / denom_info
+        nan_tensor = torch.full_like(l2_intake, float('nan'))
+        l2_intake = torch.where(torch.isinf(l2_intake) | (denom_info == 0), nan_tensor, l2_intake) # if the initial info is zero, set intake to nan
 
-        return x3, shared1, l2_before, l2_outtake, shared_sum, l2_intake, x2, outtake_ratio
+        return x3, shared1.detach(), l2_before.detach(), l2_outtake.detach(), shared_sum.detach(), l2_intake.detach(), x2, outtake_ratio.detach(), gate_mean
 
         # # ---- observation GNN1 ----
         # x_pre = x.reshape(-1, self.dim_feature)
