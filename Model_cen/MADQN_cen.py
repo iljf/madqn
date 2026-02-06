@@ -42,7 +42,7 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
 
     def king_adj(self, n: int):
-        """King-move adjacency on an n x n grid (8-neighborhood + self-loop)."""
+        
         A = np.zeros((n ** 2, n ** 2), dtype=np.float32)
 
         for i in range(n ** 2):
@@ -172,10 +172,10 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
             adj = self.adj.to(self.device)
 
-            q_all = self.gdqn(obs, adj)                  # [dim_act]
+            q_all = self.gdqn(obs, adj)              
             q_val = q_all[action]
 
-            next_q_all = self.gdqn_target(next_obs, adj)  # [dim_act]
+            next_q_all = self.gdqn_target(next_obs, adj) 
             next_q_max = torch.max(next_q_all)
 
             gamma = self.args.gamma if self.args is not None else 0.95

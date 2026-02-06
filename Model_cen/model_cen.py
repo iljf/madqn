@@ -12,20 +12,20 @@ class G_DQN(nn.Module):
         super(G_DQN, self).__init__()
         #self.eps_decay = args.eps_decay
 
-        self.observation_state = observation_state #전채 state (25*25*3)
+        self.observation_state = observation_state #전채 state (25*25*4)
         #print(self.observation_state)
         self.dim_act = dim_act
 
         #GRAPH
         self.dim_feature = self.observation_state[2] #2
-        self.gnn1 = DenseSAGEConv(self.dim_feature, 64)
-        self.gnn2 = DenseSAGEConv(64, self.dim_feature)
+        self.gnn1 = DenseSAGEConv(self.dim_feature, 128)
+        self.gnn2 = DenseSAGEConv(128, self.dim_feature)
         #self.sig = nn.Sigmoid() #sigmoid 는 아마 필요 없을 듯!
 
         #DQN
         self.dim_input = self.observation_state[0] * self.observation_state[1] * self.observation_state[2]
-        self.FC1 = nn.Linear(self.dim_input, 64)
-        self.FC2 = nn.Linear(64, dim_act)
+        self.FC1 = nn.Linear(self.dim_input, 128)
+        self.FC2 = nn.Linear(128, dim_act)
         # self.relu = nn.ReLU(inplace=True)
         self.relu = nn.ReLU()
 
@@ -40,20 +40,16 @@ class G_DQN(nn.Module):
         H, W, C = self.observation_state
         num_nodes = H * W
 
-        # normalize input to [B, N, C]
         if x.dim() == 3:
-            x_b = x.reshape(num_nodes, C).unsqueeze(0)
+            x_b = x.reshape(num_nodes, C).unsqueeze(0) # [1, N, C]
         elif x.dim() == 4:
             x_b = x.reshape(-1, num_nodes, C)
         else:
-            # fallback for already-flattened input
             x_b = x.reshape(-1, num_nodes, C)
 
-        # ensure adj has batch dimension [B, N, N]
         if adj.dim() == 2:
-            adj_b = adj.unsqueeze(0)
-        else:
-            adj_b = adj
+            adj_b = adj.unsqueeze(0) # [1, N, N]
+
 
         x1 = self.gnn1(x_b, adj_b)
         x1 = F.elu(x1)
@@ -64,7 +60,6 @@ class G_DQN(nn.Module):
         x2 = self.relu(self.FC1(x2))
         q = self.FC2(x2)
 
-        # most call sites use batch size 1
         if q.size(0) == 1:
             return q.squeeze(0)
         return q

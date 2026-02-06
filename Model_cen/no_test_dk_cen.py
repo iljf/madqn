@@ -7,6 +7,25 @@ import tqdm
 import numpy as np
 import os
 
+
+MOVE_ACTIONS = {0, 1, 3, 4}
+
+
+def last(values, k=1, default=0.0):
+	try:
+		return values[-k]
+	except Exception:
+		return default
+
+
+def get_agent_positions(env):
+	handles = env.env.env.env.env.get_handles()
+	pos_predator1 = env.env.env.env.env.get_pos(handles[0])
+	pos_predator2 = env.env.env.env.env.get_pos(handles[1])
+
+	return pos_predator1, pos_predator2
+
+
 def get_args():
 	parser = argparse.ArgumentParser(description='MADQN_cen')
 
@@ -53,14 +72,14 @@ def get_args():
 
 args = get_args()
 
-wandb.init(project="MADQN_cen", entity='hails',config=args.__dict__)
+wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
 wandb.run.name = 'madqn_centralized'
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
 render_mode = 'rgb_array'
 
-entire_state = (args.map_size,args.map_size,args.dim_feature)
+entire_state = (args.map_size, args.map_size, args.dim_feature * 2) # H, W, C*2
 dim_act = 13
 
 n_predator1 = args.n_predator1
@@ -82,35 +101,84 @@ madqn = MADQN(n_predator1, n_predator2, dim_act, entire_state, device=device, bu
 		# # ?? ?? ??? ?? ??? ??
 		# madqn.gdqns[i].load_state_dict(model_state_dict)
 
-def process_array(arr):  #predator1 (obs, team, team_hp, predator2, predator2 hp, prey, prey hp)
+# def _expand_team_and_pred2(result):
+# 	pos_list1 = np.argwhere(result[:, :, 1] == 1)
+# 	pos_list2 = np.argwhere(result[:, :, 2] == 1)
+#
+# 	H, W, _ = result.shape
+#
+# 	for i in pos_list1:
+# 		r, c = int(i[0]), int(i[1])
+# 		if r + 1 < H:
+# 			result[r + 1, c, 1] = 1
+# 		if c + 1 < W:
+# 			result[r, c + 1, 1] = 1
+# 		if (r + 1 < H) and (c + 1 < W):
+# 			result[r + 1, c + 1, 1] = 1
+#
+# 	for i in pos_list2:
+# 		r, c = int(i[0]), int(i[1])
+# 		if r + 1 < H:
+# 			result[r + 1, c, 2] = 1
+# 		if c + 1 < W:
+# 			result[r, c + 1, 2] = 1
+# 		if (r + 1 < H) and (c + 1 < W):
+# 			result[r + 1, c + 1, 2] = 1
+#
+# 	return result
 
+
+def process_array_1(arr):
 	arr = np.delete(arr, [2, 4, 6], axis=2)
 	result = np.dstack((arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]))
-
-	pos_list1 = np.argwhere(result[:, :, 1] == 1)
-	pos_list2 = np.argwhere(result[:, :, 2] == 1)
-
-	H, W, _ = result.shape
-
-	for i in pos_list1:
-		r, c = int(i[0]), int(i[1])
-		if r + 1 < H:
-			result[r + 1, c, 1] = 1
-		if c + 1 < W:
-			result[r, c + 1, 1] = 1
-		if (r + 1 < H) and (c + 1 < W):
-			result[r + 1, c + 1, 1] = 1
-
-	for i in pos_list2:
-		r, c = int(i[0]), int(i[1])
-		if r + 1 < H:
-			result[r + 1, c, 2] = 1
-		if c + 1 < W:
-			result[r, c + 1, 2] = 1
-		if (r + 1 < H) and (c + 1 < W):
-			result[r + 1, c + 1, 2] = 1
-
 	return result
+
+
+def process_array_2(arr):
+	arr = np.delete(arr, [2, 4, 6], axis=2)
+	result = np.dstack((arr[:, :, 0], arr[:, :, 1], arr[:, :, 3], arr[:, :, 2]))
+	return result
+
+
+def pos_overlay(global_obs, local_obs, pos, view_range): # (view_range*2, view_range*2, C) with pos
+	overlay = np.zeros_like(global_obs)
+	if pos is None:
+		return overlay
+
+	H, W, _ = global_obs.shape
+	patch_h, patch_w, _ = local_obs.shape
+
+	try:
+		x_center = int(pos[1])
+		y_center = int(pos[0])
+	except Exception:
+		return overlay
+
+
+	x0 = x_center - (view_range - 1) # slice from global state - 2*view_range
+	x1 = x_center + (view_range + 1)
+	y0 = y_center - (view_range - 1)
+	y1 = y_center + (view_range + 1)
+
+	o_x0 = max(x0, 0)
+	o_x1 = min(x1, H)
+	o_y0 = max(y0, 0)
+	o_y1 = min(y1, W)
+
+	
+	p_x0 = o_x0 - x0  # corresponding patch slice
+	p_y0 = o_y0 - y0
+	p_x1 = p_x0 + (o_x1 - o_x0)
+	p_y1 = p_y0 + (o_y1 - o_y0)
+
+	p_x1 = min(p_x1, patch_h) # patch clip
+	p_y1 = min(p_y1, patch_w)
+	o_x1 = o_x0 + (p_x1 - p_x0)
+	o_y1 = o_y0 + (p_y1 - p_y0)
+
+	if (o_x1 > o_x0) and (o_y1 > o_y0) and (p_x1 > p_x0) and (p_y1 > p_y0):
+		overlay[o_x0:o_x1, o_y0:o_y1, :] = local_obs[p_x0:p_x1, p_y0:p_y1, :]
+	return overlay
 
 def main():
 
@@ -118,6 +186,13 @@ def main():
 
 		iteration_number = 0
 		ep_reward = 0
+		ep_reward_pred1 = 0
+		ep_reward_pred2 = 0
+		ep_reward_np = 0
+		ep_reward_pred1_np = 0
+		ep_reward_pred2_np = 0
+		ep_move_count_pred1 = 0
+		ep_move_count_pred2 = 0
 
 		env = hetero_adversarial_v1.env(map_size=args.map_size, minimap_mode=False, tag_penalty=args.tag_penalty,
 									max_cycles=args.max_update_steps, extra_features=False, render_mode=render_mode,
@@ -136,6 +211,10 @@ def main():
 		observations_dict = {}
 		for agent_idx in range(n_predator1 + n_predator2):
 			observations_dict[agent_idx] = []
+
+		agent_pos = {}
+		for agent_idx in range(n_predator1 + n_predator2):
+			agent_pos[agent_idx] = []
 
 		reward_dict = {}
 		for agent_idx in range(n_predator1 + n_predator2):
@@ -162,55 +241,120 @@ def main():
 			step_idx = iteration_number // (args.n_predator1 + args.n_predator2 + args.n_prey)
 
 			if (((iteration_number) % (args.n_predator1 + args.n_predator2 + args.n_prey)) == 0
-					and step_idx > 1 and step_idx != args.max_update_steps):
+					and step_idx > 0 and step_idx != args.max_update_steps):
 
 				total_last_rewards = 0
 				total_move_penalty = 0
+				total_last_rewards_np = 0
+				step_reward_pred1 = 0
+				step_reward_pred2 = 0
+				step_penalty_pred1 = 0
+				step_penalty_pred2 = 0
+				step_move_count_pred1 = 0
+				step_move_count_pred2 = 0
 
 				for agent_rewards in reward_dict.values():
-					total_last_rewards += np.sum(agent_rewards[-1])
+					total_last_rewards += np.sum(last(agent_rewards, k=1, default=0.0))
+					total_last_rewards_np += np.sum(last(agent_rewards, k=1, default=0.0))
 
 				for penalty in move_penalty_dict.values():
-					total_move_penalty += np.sum(penalty[-2])
+					total_move_penalty += np.sum(last(penalty, k=1, default=0.0))
+
+				for idx in range(args.n_predator1 + args.n_predator2):
+					agent_reward = float(last(reward_dict[idx], k=1, default=0.0))
+					agent_penalty = float(last(move_penalty_dict[idx], k=1, default=0.0))
+					agent_action = last(action_dict[idx], k=1, default=None)
+					is_move = (agent_action is not None) and (int(agent_action) in MOVE_ACTIONS)
+
+					if idx < args.n_predator1:
+						step_reward_pred1 += agent_reward
+						step_penalty_pred1 += agent_penalty
+						step_move_count_pred1 += int(is_move)
+					else:
+						step_reward_pred2 += agent_reward
+						step_penalty_pred2 += agent_penalty
+						step_move_count_pred2 += int(is_move)
+
 
 				total_last_rewards = total_last_rewards + total_move_penalty
 
 				ep_reward += total_last_rewards
+				ep_reward_np += total_last_rewards_np
 
-				for idx in range(args.n_predator1 + args.n_predator2):
+				step_rewards_pred1 = step_reward_pred1 + step_penalty_pred1
+				step_rewards_pred2 = step_reward_pred2 + step_penalty_pred2
+				ep_reward_pred1 += step_rewards_pred1
+				ep_reward_pred2 += step_rewards_pred2
+				ep_reward_pred1_np += step_reward_pred1
+				ep_reward_pred2_np += step_reward_pred2
+				ep_move_count_pred1 += step_move_count_pred1
+				ep_move_count_pred2 += step_move_count_pred2
 
-					# madqn.set_agent_info(agent, pos, view_range)
+				# Only start pushing transitions once we have (t-1, t) history
+				if step_idx > 1:
+					for idx in range(args.n_predator1 + args.n_predator2):
+						madqn.set_agent_buffer(idx)
+						madqn.buffer.put(
+							observations_dict[idx][-2],
+							action_dict[idx][-2],
+							total_last_rewards,
+							observations_dict[idx][-1],
+							termination_dict[idx][-2],
+							truncation_dict[idx][-2],
+						)
 
-					madqn.set_agent_buffer(idx)
+				# print('ep:{}'.format(ep))
+				# print("predator total_reward", total_last_rewards)
+				# print("*"*10)
 
-					madqn.buffer.put(observations_dict[idx][-2],
-									 action_dict[idx][-2],
-									 total_last_rewards,
-									 observations_dict[idx][-1],
-									 termination_dict[idx][-2],
-									 truncation_dict[idx][-2])
+				metrics = {
+					"steps/step": step_idx,
+					"steps/total_step_reward": float(total_last_rewards),
+					"steps/total_step_reward_np": float(total_last_rewards_np),
+					"predator1/step_reward": float(step_rewards_pred1),
+					"predator2/step_reward": float(step_rewards_pred2),
+					"predator1/step_reward_np": float(step_reward_pred1),
+					"predator2/step_reward_np": float(step_reward_pred2),
+					"predator1/move_count": int(step_move_count_pred1),
+					"predator2/move_count": int(step_move_count_pred2),
+				}
 
-					# wandb.log({"action_{}".format(idx): action_dict[idx][-2]})
-
-				print('ep:{}'.format(ep))
-				print("predator total_reward", total_last_rewards)
-				print("*"*10)
+				wandb.log(metrics)
 
 				# if madqn.buffer.size() >= args.trainstart_buffersize:
 				# 	wandb.log({"total_last_rewards": total_last_rewards })
 
 
-			_, reward, termination, truncation, info = env.last()
-			observation = env.state()
-			observation_temp = process_array(observation)
+			observation_local, reward, termination, truncation, info = env.last()
+			observation_global = env.state()
+			global_obs = process_array_1(observation_global)
 
 			if agent[:8] == "predator":
 
-				if agent[9] == "1":
-					idx = int(agent[11:])
+				pos_predator1, pos_predator2 = get_agent_positions(env)
 
-				else:
+				if agent[9] == "1": # predator1
+					idx = int(agent[11:])
+					pos = pos_predator1[idx]
+					view_range = args.predator1_view_range
+
+				else: # predator2
 					idx = int(agent[11:]) + n_predator1
+					pos = pos_predator2[idx - n_predator1]
+					view_range = args.predator2_view_range
+
+				if agent[9] == "1":
+					local_obs = process_array_1(observation_local)
+				else:
+					local_obs = process_array_2(observation_local)
+				local_overlay = pos_overlay(
+					global_obs=global_obs,
+					local_obs=local_obs,
+					pos=pos,
+					view_range=view_range,
+				)
+
+				observation_temp = np.concatenate((global_obs, local_overlay), axis=2)
 
 				madqn.set_agent_info(agent)
 
@@ -224,8 +368,8 @@ def main():
 					env.step(action)
 					reward = env._cumulative_rewards[agent] # agent
 
-					# ??? 0,1,2,3,4(????) ? ??? reward ? ??? ???? ??.
-					if action in [0, 1, 3, 4]:
+					# move penalty to predator1
+					if (idx < n_predator1) and (action in MOVE_ACTIONS):
 						move_penalty_dict[idx].append(args.move_penalty)
 					else:
 						move_penalty_dict[idx].append(0)
@@ -236,12 +380,13 @@ def main():
 					reward_dict[idx].append(reward)					#r
 					termination_dict[idx].append(termination)		#t_{t-1]
 					truncation_dict[idx].append(truncation)			#t_{t-1]
+					agent_pos[idx].append(pos)
 
 					if madqn.buffer.size() >= args.trainstart_buffersize:
 
 						madqn.replay()
 
-			else : #prey ??
+			else : #prey
 				_, _, termination, truncation, _ = env.last()
 
 				if termination or truncation:
@@ -257,6 +402,26 @@ def main():
 
 
 			iteration_number += 1
+
+		pred1_move = max(ep_move_count_pred1, 1)
+		pred2_move = max(ep_move_count_pred2, 1)
+
+		episode_log = {
+			"episode/episode": ep,
+			"episode/total_reward": float(ep_reward),
+			"episode/total_reward_np": float(ep_reward_np),
+			"episode/predator1_reward": float(ep_reward_pred1),
+			"episode/predator2_reward": float(ep_reward_pred2),
+			"episode/predator1_reward_np": float(ep_reward_pred1_np),
+			"episode/predator2_reward_np": float(ep_reward_pred2_np),
+			"episode/predator1_move_count": int(ep_move_count_pred1),
+			"episode/predator2_move_count": int(ep_move_count_pred2),
+			"episode/predator1_reward_over_move": float(ep_reward_pred1 / pred1_move),
+			"episode/predator2_reward_over_move": float(ep_reward_pred2 / pred2_move),
+		}
+		wandb.log(episode_log)
+
+		env.close()
 
 		# if madqn.buffer.size() >= args.trainstart_buffersize:
 		# 	wandb.log({"ep_reward": ep_reward})
@@ -275,11 +440,8 @@ def main():
 		if ep > args.total_ep: #100
 			print('*' * 10, 'train over', '*' * 10)
 			print(iteration_number)
-
 			break
 
-		# if madqn.buffer.size() >= args.trainstart_buffersize:
-		# ep? 100? ??? ??? target update ??.
 		if (madqn.buffer.size() >= args.trainstart_buffersize) and (ep % args.target_update == 0):
 			for agent in range(args.n_predator1 + args.n_predator2):
 				madqn.set_agent_model(agent)
