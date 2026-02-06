@@ -32,10 +32,10 @@ def get_args():
     parser.add_argument('--replay_times', type=int, default=32)
     parser.add_argument('--target_update', type=int, default=10)
 
-    parser.add_argument('--tau_predator1', type=float, default=0.2)
-    parser.add_argument('--tau_predator2', type=float, default=0.2)
-    parser.add_argument('--lamda_predator1', type=float, default=0)
-    parser.add_argument('--lamda_predator2', type=float, default=0)
+    parser.add_argument('--tau_predator1', type=float, default=0.5)
+    parser.add_argument('--tau_predator2', type=float, default=0.5)
+    parser.add_argument('--lamda_predator1', type=float, default=0.9)
+    parser.add_argument('--lamda_predator2', type=float, default=0.2)
 
     parser.add_argument('--map_size', type=int, default=24)
     parser.add_argument('--predator1_view_range', type=int, default=10)
@@ -53,7 +53,7 @@ def get_args():
 
 args = get_args()
 wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
-wandb.run.name = 'lamda_0_tau_0.2'
+wandb.run.name = 'lamda_0.9_tau_0.5'
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -342,8 +342,11 @@ def main():
 
                     if step_idx_ep > 1:
 
-                        step_rewards = 0
+                        step_rewards = 0 # logging [-1]
                         step_penalty_rewards = 0
+
+                        transition_rewards = 0 # (s,a,r,s' < this part) [-2]
+                        transition_penalty_rewards = 0
 
                         # ? ??? reward? ???? ?? ??
                         step_reward_pred1 = 0
@@ -359,12 +362,15 @@ def main():
 
                         for agent_rewards in reward_dict.values():
                             step_rewards += np.sum(agent_rewards[-1])
+                            transition_rewards += np.sum(agent_rewards[-2])
 
                         for penalty in move_penalty_dict.values():
-                            step_penalty_rewards += np.sum(penalty[-2])
+                            step_penalty_rewards += np.sum(penalty[-1])
+                            transition_penalty_rewards += np.sum(penalty[-2])
 
                         # ?? ? ??? ??? ? ???? ?? reward? ???? ??
                         step_rewards = step_rewards + step_penalty_rewards
+                        transition_rewards = transition_rewards + transition_penalty_rewards
 
                         # ep ? ?? ?? reward? ????? ??
                         ep_reward += step_rewards
@@ -404,7 +410,7 @@ def main():
                             madqn.buffer.put(observations_dict[idx][-2],
                                              book_dict[idx][-2],
                                              action_dict[idx][-2],
-                                             step_rewards,
+                                             transition_rewards,
                                              observations_dict[idx][-1],
                                              book_dict[idx][-1],
                                              termination_dict[idx][-2],
