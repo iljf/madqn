@@ -56,21 +56,16 @@ def get_args():
 args = get_args()
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
-
 wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
 wandb.run.name = 'model_decen'
 
 render_mode = 'rgb_array'
-
-#env = hetero_adversarial_v1.env(map_size=args.map_size, minimap_mode=False, tag_penalty=-0.2,
-# max_cycles=args.max_update_steps, extra_features=False,render_mode=render_mode)
 
 predator1_view_range = args.predator1_view_range
 predator2_view_range = args.predator2_view_range
 n_predator1 = args.n_predator1
 n_predator2 = args.n_predator2
 n_prey = args.n_prey
-
 dim_feature = args.dim_feature
 
 
@@ -89,29 +84,54 @@ batch_size = 1
 madqn = MADQN(n_predator1, n_predator2, predator1_obs, predator2_obs, dim_act, args.buffer_size, device, args=args)
 
 def process_array_1(arr):  #predator1 (obs, team, team hp, predator2, predator2 hp, prey, prey hp)
+
     arr = np.delete(arr, [2, 4, 6], axis=2)
     result = np.dstack((arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]))
+
     return result
 
 
 def process_array_2(arr): #predator2 (obs, team, team hp, prey, prey hp, predator2, predator2 hp)
+
     arr = np.delete(arr, [2, 4, 6], axis=2)
     result = np.dstack((arr[:, :, 0], arr[:, :, 1], arr[:, :, 3], arr[:, :, 2]))
+    
     return result
 
 
 def main():
+    env = hetero_adversarial_v1.env(map_size=args.map_size,
+                                    minimap_mode=False,
+                                    tag_penalty=args.tag_penalty,
+                                    max_cycles=args.max_update_steps,
+                                    extra_features=False,
+                                    render_mode=render_mode,
+                                    predator1_view_range=args.predator1_view_range,
+                                    predator2_view_range=args.predator2_view_range,
+                                    n_predator1=args.n_predator1,
+                                    n_predator2=args.n_predator2,
+                                    n_prey=args.n_prey,
+                                    tag_reward=args.tag_reward,
+    )
+
+    step_idx_ep = 0
 
     for ep in range(args.total_ep):
 
-        ep_reward = 0.0
-        ep_reward_np = 0.0
-        ep_reward_pred1 = 0.0
-        ep_reward_pred2 = 0.0
-        ep_reward_pred1_np = 0.0
-        ep_reward_pred2_np = 0.0
-        ep_move_count_pred1 = 0
-        ep_move_count_pred2 = 0
+        # env reset
+        env.reset(seed=args.seed)
+
+        ep_reward = 0
+        ep_reward_pred1 = 0
+        ep_reward_pred2 = 0
+
+        # episode reward without move penalty
+        ep_reward_np = 0
+        ep_reward_pred1_np = 0
+        ep_reward_pred2_np = 0
+
+        # ep_move_count_pred1 = 0
+        # ep_move_count_pred2 = 0
 
         n_iteration = 0
 
@@ -144,23 +164,6 @@ def main():
             reward_np_dict[agent_idx] = []
 
 
-        env = hetero_adversarial_v1.env(
-            map_size=args.map_size,
-            minimap_mode=False,
-            tag_penalty=args.tag_penalty,
-            max_cycles=args.max_update_steps,
-            extra_features=False,
-            render_mode=render_mode,
-            predator1_view_range=args.predator1_view_range,
-            predator2_view_range=args.predator2_view_range,
-            n_predator1=args.n_predator1,
-            n_predator2=args.n_predator2,
-            n_prey=args.n_prey,
-            tag_reward=args.tag_reward,
-        )
-        env.reset(seed=args.seed)
-
-
         print("ep:",ep,'*' * 80)
 
         for agent in env.agent_iter():
@@ -168,7 +171,6 @@ def main():
             n_agents = (args.n_predator1 + args.n_predator2 + args.n_prey)
             step_idx_ep = n_iteration // n_agents
 
-            # Log previous step when the next step begins (final_model timing).
             if (n_agents > 0) and ((n_iteration % n_agents) == 0) and (step_idx_ep > 0):
                 prev_step = step_idx_ep - 1
 

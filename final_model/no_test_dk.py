@@ -146,7 +146,6 @@ def main():
 
     )
 
-
     step_idx_ep = 0
 
     for ep in range(args.total_ep):
@@ -155,7 +154,7 @@ def main():
         shared = th.zeros(shared_shape)
         madqn.reset_shared(shared)
 
-        # reset ep_move_count : ? ?????? Plot? ??? ?? ?? action? ???? ????? ???? ??
+        # reset ep_move_count
         madqn.reset_ep_move_count()
 
         # env reset

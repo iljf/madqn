@@ -204,6 +204,7 @@ def main():
 									tag_reward=args.tag_reward,
 									)
 
+		
 		env.reset(seed=args.seed)
 		print("ep:",ep,'*' * 80)
 
