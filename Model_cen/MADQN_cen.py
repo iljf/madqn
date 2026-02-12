@@ -1,3 +1,4 @@
+from pyparsing import deque
 from model_cen import G_DQN, G_ReplayBuffer
 import numpy as np
 import random
@@ -40,6 +41,20 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         self.gdqn_optimizer = None
         self.buffer = None
 
+        self.team_idx = 0
+        self.ep_move_count_pred = {0: 0, 1: 0}
+        self.step_move_count_pred = {0: 0, 1: 0}
+        self.step_tag_count_pred = {0: 0, 1: 0}
+
+        self.agent_action_deque_dict = {}  # 각 에이전트가 avg에 따라 액션(움직임,가만히있음,태그)을 어떻게 하는지 저장하기 위한 딕셔너리
+        for agent_idx in range(n_predator1 + n_predator2):
+            self.agent_action_deque_dict[agent_idx] = deque(maxlen=args.deque_len)
+
+        dq_len = int(getattr(args, "deque_len", 400)) if args is not None else 400
+        self.avg_move_deque_pred1 = deque(maxlen=dq_len)
+        self.avg_move_deque_pred2 = deque(maxlen=dq_len)
+        self.avg_tag_deque_pred1 = deque(maxlen=dq_len)
+        self.avg_tag_deque_pred2 = deque(maxlen=dq_len)
 
     def king_adj(self, n: int):
         
@@ -138,10 +153,72 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         self.gdqn_optimizer = self.gdqn_optimizers[self.idx]
         self.buffer = self.buffers[self.idx]
 
+    def set_team_idx(self,idx):
+        self.team_idx = idx
 
     def set_agent_buffer(self ,idx):
         self.buffer = self.buffers[idx]
 
+    def set_agent_pos(self, pos):
+        self.pos = pos
+
+    def set_agent_shared(self, view_range):
+        self.view_range = view_range
+
+    def set_agent_model(self,agent):
+        self.gdqn = self.gdqns[agent]
+        self.gdqn_target = self.gdqn_targets[agent]
+
+
+
+    #########################################
+    ##############move & count###############
+    #########################################
+
+    # move count 에 대한 매서드
+    # for ep team move counting
+    def ep_move_count(self):
+        self.ep_move_count_pred[self.team_idx] += 1
+
+    def reset_ep_move_count(self):
+        self.ep_move_count_pred[0] = 0
+        self.ep_move_count_pred[1] = 0
+
+    # for step team move counting
+    # 매 스텝이 시작할때마다 reset 을 해주어야함
+    def step_move_count(self):
+        self.step_move_count_pred[self.team_idx] += 1
+
+    def reset_step_move_count(self):
+        self.step_move_count_pred[0] = 0
+        self.step_move_count_pred[1] = 0
+
+    # tag count 에 대한 매서드
+    # for ep team move counting
+    def step_tag_count(self):
+        self.step_tag_count_pred[self.team_idx] += 1
+
+    def reset_step_tag_count(self):
+        self.step_tag_count_pred[0] = 0
+        self.step_tag_count_pred[1] = 0
+
+    def set_agent_buffer(self ,idx):
+        self.buffer = self.buffers[idx]
+
+    #avg_move
+    def avg_move_append_pred1(self, move):
+        self.avg_move_deque_pred1.append(move)
+
+    def avg_move_append_pred2(self, move):
+        self.avg_move_deque_pred2.append(move)
+
+    #avg_tag
+    def avg_tag_append_pred1(self, tag):
+        self.avg_tag_deque_pred1.append(tag)
+
+    def avg_tag_append_pred2(self, tag):
+        self.avg_tag_deque_pred2.append(tag)
+        
 
     def get_action(self, state, mask=None):
 

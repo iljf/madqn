@@ -38,10 +38,10 @@ def get_args():
     parser.add_argument('--replay_times', type=int, default=32)
     parser.add_argument('--target_update', type=int, default=10)
 
-    parser.add_argument('--tau_predator1', type=float, default=0.5)
-    parser.add_argument('--tau_predator2', type=float, default=0.5)
-    parser.add_argument('--lamda_predator1', type=float, default=0.9)
-    parser.add_argument('--lamda_predator2', type=float, default=0.2)
+    parser.add_argument('--tau_predator1', type=float, default=0.2)
+    parser.add_argument('--tau_predator2', type=float, default=0.2)
+    parser.add_argument('--lamda_predator1', type=float, default=1)
+    parser.add_argument('--lamda_predator2', type=float, default=1)
 
     parser.add_argument('--map_size', type=int, default=24)
     parser.add_argument('--predator1_view_range', type=int, default=10)
@@ -58,8 +58,8 @@ def get_args():
     return parser.parse_args()
 
 args = get_args()
-wandb.init(project="MADQN_01", entity='hails',config=args.__dict__)
-wandb.run.name = 'lamda_0.9_tau_0.5'
+wandb.init(project="madqn_test", entity='hails',config=args.__dict__)
+wandb.run.name = 'lamda_1_tau_0.2'
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -166,18 +166,6 @@ def main():
         # env reset
         env.reset(seed=args.seed)
 
-        ep_reward = 0
-        ep_reward_pred1 = 0
-        ep_reward_pred2 = 0
-
-        # episode reward without move penalty
-        ep_reward_np = 0
-        ep_reward_pred1_np = 0
-        ep_reward_pred2_np = 0
-
-        # iteration for single agent
-        n_iteration = 0
-
         observations_dict = {}
         for agent_idx in range(n_predator1 + n_predator2):
             observations_dict[agent_idx] = []
@@ -216,22 +204,44 @@ def main():
 
         entire_pos = []
 
-        print("ep:", ep, '*' * 30)
+        handles = env.env.env.env.env.get_handles()
+        pos_predator1 = env.env.env.env.env.get_pos(handles[0])
+        pos_predator2 = env.env.env.env.env.get_pos(handles[1])
+        entire_pos.append(np.concatenate((pos_predator1, pos_predator2)))
 
+        ep_reward = 0
+        ep_reward_pred1 = 0
+        ep_reward_pred2 = 0
+
+        # episode reward without move penalty
+        ep_reward_np = 0
+        ep_reward_pred1_np = 0
+        ep_reward_pred2_np = 0
+
+        # iteration for single agent
+        n_iteration = 0
+        
+        print("ep:", ep, '*' * 30)
+        
         for agent in env.agent_iter():
 
             n_agents = (args.n_predator1 + args.n_predator2 + args.n_prey)
             step_idx_ep = n_iteration // n_agents
 
+            '''
+            from this point on, every append to dict and logging is based on **POST STEP**
+            which means that the information is from the last step ([-1] index)
+            '''
+            # ---- step boundary (log previous completed step) ----
             if ((n_iteration % n_agents) == 0) and (n_agents > 0):
-
+                
                 if step_idx_ep > 0:
                     madqn.shared_decay() 
 
                     ### Book append & decay ###
                     if step_idx_ep != args.max_update_steps:
 
-                        if step_idx_ep <= args.book_term: # book_term = 4
+                        if step_idx_ep <= args.book_term:
 
                             for idx in range(n_predator1 + n_predator2):
                                 madqn.set_agent_pos(agent_pos[idx][-1]) # agent position
@@ -269,340 +279,321 @@ def main():
                                 madqn.to_guestbook(shared_info_dict[idx][-1].to('cpu')) # append last iteration info
 
 
-                        madqn.avg_dist_append_pred1(check_zero_size_avg_pred1(madqn.summation_team_dist[0]))  # step
-                        madqn.min_dist_append_pred1(check_zero_size_min_pred1(madqn.summation_team_dist[0]))  # step
-                        madqn.avg_move_append_pred1((madqn.step_move_count_pred[0]) / n_predator1)  # step
-                        madqn.avg_tag_append_pred1((madqn.step_tag_count_pred[0]) / n_predator1)  # step
+                    madqn.avg_dist_append_pred1(check_zero_size_avg_pred1(madqn.summation_team_dist[0]))  # step
+                    madqn.min_dist_append_pred1(check_zero_size_min_pred1(madqn.summation_team_dist[0]))  # step
+                    madqn.avg_move_append_pred1((madqn.step_move_count_pred[0]) / n_predator1)  # step
+                    madqn.avg_tag_append_pred1((madqn.step_tag_count_pred[0]) / n_predator1)  # step
 
-                        madqn.avg_dist_append_pred2(check_zero_size_avg_pred2(madqn.summation_team_dist[1]))  # step
-                        madqn.min_dist_append_pred2(check_zero_size_min_pred2(madqn.summation_team_dist[1]))  # step
-                        madqn.avg_move_append_pred2((madqn.step_move_count_pred[1]) / n_predator2)  # step
-                        madqn.avg_tag_append_pred2((madqn.step_tag_count_pred[1]) / n_predator2)  # step
+                    madqn.avg_dist_append_pred2(check_zero_size_avg_pred2(madqn.summation_team_dist[1]))  # step
+                    madqn.min_dist_append_pred2(check_zero_size_min_pred2(madqn.summation_team_dist[1]))  # step
+                    madqn.avg_move_append_pred2((madqn.step_move_count_pred[1]) / n_predator2)  # step
+                    madqn.avg_tag_append_pred2((madqn.step_tag_count_pred[1]) / n_predator2)  # step
 
-                        madqn.reset_step_move_count()
-                        madqn.reset_step_tag_count()
-                        madqn.reset_summation_team_dist()
+                    madqn.reset_step_move_count()
+                    madqn.reset_step_tag_count()
+                    madqn.reset_summation_team_dist()
 
-                        # out take? ??? plot(==case2)? ?? ?? ??? ??? ???? ??
-                        pos_list = np.concatenate((pos_predator1, pos_predator2), axis=0)
-                        # ? ?????? preator1? predator2? ??? ??? ??? ??? ?? -> ???: predator1? ??? ?? , ????: predator2? ??? ??
-                        ratio_matrix = madqn.calculate_Overlap_ratio(pos_list)
+                    handles = env.env.env.env.env.get_handles()
+                    pos_predator1 = env.env.env.env.env.get_pos(handles[0])
+                    pos_predator2 = env.env.env.env.env.get_pos(handles[1])
 
-                        #? ????? ?? Observation ?? ?? predator1? ??? ??
-                        for idx, value in enumerate(ratio_matrix[:, 0]):
-                            madqn.agent_graph_overlap_pred1_deque_dict[idx].append(value)
+                    pos_list = np.concatenate((pos_predator1, pos_predator2), axis=0)
+                    ratio_matrix = madqn.calculate_Overlap_ratio(pos_list)
 
-                        #? ????? ?? Observation ?? ?? predator2? ??? ??
-                        # a? ? ?? ?? ??? self.agent_graph_overlap_pred2_deque_dict? ??
-                        for idx, value in enumerate(ratio_matrix[:, 1]):
-                            madqn.agent_graph_overlap_pred2_deque_dict[idx].append(value)
+                    for idx, value in enumerate(ratio_matrix[:, 0]):
+                        madqn.agent_graph_overlap_pred1_deque_dict[idx].append(value)
 
-                    else:
-                        madqn.avg_dist_append_pred1(check_zero_size_avg_pred1(madqn.summation_team_dist[0]))
-                        madqn.min_dist_append_pred1(check_zero_size_min_pred1(madqn.summation_team_dist[0]))
-                        madqn.avg_move_append_pred1((madqn.step_move_count_pred[0]) / n_predator1)
-                        madqn.avg_tag_append_pred1((madqn.step_tag_count_pred[0]) / n_predator1)
+                    for idx, value in enumerate(ratio_matrix[:, 1]):
+                        madqn.agent_graph_overlap_pred2_deque_dict[idx].append(value)
+
+                    prev_step = step_idx_ep - 1 # logging based on previous  step
+
+                    step_rewards = 0.0
+                    step_penalty_rewards = 0.0
+
+                    # team logging
+                    step_reward_pred1 = 0.0
+                    step_reward_pred2 = 0.0
+                    step_penalty_pred1 = 0.0
+                    step_penalty_pred2 = 0.0
                     
+                    '''
+                    In step 0, no dict has any value yet. So skip
+                    '''
+                    for i, agent_rewards in enumerate(reward_dict.values()):  # both pred1 & pred2
+                        if len(agent_rewards) < 1:
+                            continue
+                        r = float(np.sum(agent_rewards[-1]))
+                        step_rewards += r
+                        if i < len(reward_dict) // 2:
+                            step_reward_pred1 += r
+                        else:
+                            step_reward_pred2 += r
 
-                        madqn.avg_dist_append_pred2(check_zero_size_avg_pred2(madqn.summation_team_dist[1]))
-                        madqn.min_dist_append_pred2(check_zero_size_min_pred2(madqn.summation_team_dist[1]))
-                        madqn.avg_move_append_pred2((madqn.step_move_count_pred[1]) / n_predator2)
-                        madqn.avg_tag_append_pred2((madqn.step_tag_count_pred[1]) / n_predator2)
-                    
+                    for i, penalties in enumerate(move_penalty_dict.values()):  # both pred1 & pred2
+                        if len(penalties) < 1:
+                            continue
+                        p = float(np.sum(penalties[-1]))
+                        step_penalty_rewards += p
+                        if i < len(move_penalty_dict) // 2:
+                            step_penalty_pred1 += p
+                        else:
+                            step_penalty_pred2 += p
 
-                        madqn.reset_step_move_count()
-                        madqn.reset_step_tag_count() 
-                        madqn.reset_summation_team_dist()
-                    
-                        pos_list = np.concatenate((pos_predator1, pos_predator2), axis=0)
-                        ratio_matrix = madqn.calculate_Overlap_ratio(pos_list)
+                    step_rewards_total = step_rewards + step_penalty_rewards
+                    step_rewards_pred1 = step_reward_pred1 + step_penalty_pred1
+                    step_rewards_pred2 = step_reward_pred2 + step_penalty_pred2
 
-                        for idx, value in enumerate(ratio_matrix[:, 0]):
-                            madqn.agent_graph_overlap_pred1_deque_dict[idx].append(value)
-                    
-                        for idx, value in enumerate(ratio_matrix[:, 1]):
-                            madqn.agent_graph_overlap_pred2_deque_dict[idx].append(value)
+                    ep_reward += step_rewards_total
+                    ep_reward_pred1 += step_rewards_pred1
+                    ep_reward_pred2 += step_rewards_pred2
+
+                    ep_reward_pred1_np += step_reward_pred1
+                    ep_reward_pred2_np += step_reward_pred2
+                    ep_reward_np += (step_reward_pred1 + step_reward_pred2)
 
                     if step_idx_ep > 1:
+                        # transition reward for replay buffer
+                        transition_rewards = 0.0
+                        transition_penalty_rewards = 0.0
 
-                        step_rewards = 0 # logging [-1] when step is ended
-                        step_penalty_rewards = 0
+                        for agent_rewards in reward_dict.values():
+                            if len(agent_rewards) >= 2:
+                                transition_rewards += float(np.sum(agent_rewards[-2]))
 
-                        transition_rewards = 0 # (s,a,r,s' < this part) [-2] when iteration is ended
-                        transition_penalty_rewards = 0
+                        for penalties in move_penalty_dict.values():
+                            if len(penalties) >= 2:
+                                transition_penalty_rewards += float(np.sum(penalties[-2]))
 
-                        # per team logging
-                        step_reward_pred1 = 0
-                        step_reward_pred2 = 0
-                        step_penalty_pred1 = 0
-                        step_penalty_pred2 = 0
-                        step_rewards_pred1 = 0
-                        step_rewards_pred2 = 0
-
-                        for agent_rewards in reward_dict.values(): # both pred1 & pred2
-                            step_rewards += np.sum(agent_rewards[-1])
-                            transition_rewards += np.sum(agent_rewards[-2])
-
-                        for penalty in move_penalty_dict.values(): # both pred1 & pred2
-                            step_penalty_rewards += np.sum(penalty[-1])
-                            transition_penalty_rewards += np.sum(penalty[-2])
-
-
-                        step_rewards = step_rewards + step_penalty_rewards # r_t
-                        transition_rewards = transition_rewards + transition_penalty_rewards # r_t-1
-
-                        ep_reward += step_rewards
-
-                        for i, agent_rewards in enumerate(reward_dict.values()):
-                            if i < len(reward_dict) // 2:
-                                step_reward_pred1 += np.sum(agent_rewards[-1])
-                            else:
-                                step_reward_pred2 += np.sum(agent_rewards[-1])
-
-                        for i, agent_penalty in enumerate(move_penalty_dict.values()):
-                            if i < len(reward_dict) // 2:
-                                step_penalty_pred1 += np.sum(agent_penalty[-1])
-                            else:
-                                step_penalty_pred2 += np.sum(agent_penalty[-1])
-
-                        # episode reward with move penalty
-                        step_rewards_pred1 = step_reward_pred1 + step_penalty_pred1
-                        step_rewards_pred2 = step_reward_pred2 + step_penalty_pred2
-
-                        ep_reward_pred1 += step_rewards_pred1
-                        ep_reward_pred2 += step_rewards_pred2
-
-                        # episode reward without move penalty
-                        ep_reward_pred1_np += step_reward_pred1
-                        ep_reward_pred2_np += step_reward_pred2
-                        ep_reward_np += (step_reward_pred1 + step_reward_pred2)
+                        transition_rewards_total = transition_rewards + transition_penalty_rewards
 
                         for idx in range(n_predator1 + n_predator2):
                             madqn.set_agent_buffer(idx)
 
-                            madqn.buffer.put(observations_dict[idx][-2],
-                                             book_dict[idx][-2],
-                                             action_dict[idx][-2],
-                                             transition_rewards,
-                                             observations_dict[idx][-1],
-                                             book_dict[idx][-1],
-                                             termination_dict[idx][-2],
-                                             truncation_dict[idx][-2])
-
-                        metrics = {
-                            "steps/total_step_reward": step_rewards,
-                            "predator1/step_reward": step_rewards_pred1,
-                            "predator2/step_reward": step_rewards_pred2,
-                            "steps/total_step_reward_np": step_reward_pred1 + step_reward_pred2,
-                            "predator1/step_reward_np": step_reward_pred1,
-                            "predator2/step_reward_np": step_reward_pred2,
-                            "predator1/avg_tag_count": madqn.avg_tag_deque_pred1[-1],
-                            "predator2/avg_tag_count": madqn.avg_tag_deque_pred2[-1],
-                            "predator1/avg_move_count": madqn.avg_move_deque_pred1[-1],
-                            "predator2/avg_move_count": madqn.avg_move_deque_pred2[-1],
-                        }
-
-                        # overlap ratio with predator1 logging
-                        for idx, value in madqn.agent_graph_overlap_pred1_deque_dict.items():
-                            last_value = value[-1]
-
-                            if idx < n_predator1: # predator1 agents with predator1
-                                metrics[f"predator1/Overlap_ratio_predator1_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1 # predator2 agents with predator1
-                                metrics[f"predator2/Overlap_ratio_predator1_P2_{pred2_idx}"] = last_value
-
-                        # overlap ratio with predator2 logging
-                        for idx, value in madqn.agent_graph_overlap_pred2_deque_dict.items():
-                            last_value = value[-1]
-
-                            if idx < n_predator1: # predator1 agents with predator2
-                                metrics[f"predator1/Overlap_ratio_predator2_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1 # predator2 agents with predator2
-                                metrics[f"predator2/Overlap_ratio_predator2_P2_{pred2_idx}"] = last_value
-
-                        # team1? view? ??? ??? intake? ??? ????? ????? ??
-                        for idx, value in madqn.intake_sum_with_pred1_deque_dict.items():
-                            last_value = value[-1]
-
-                            if idx < n_predator1: # predator1 agents with predator1
-                                metrics[f"predator1/Sum_intake_diff_predator1_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1 # predator2 agents with predator1
-                                metrics[f"predator2/Sum_intake_diff_predator1_P2_{pred2_idx}"] = last_value
-
-                        # team2? view? ??? ??? intake? ??? ????? ????? ??
-                        for idx, value in madqn.intake_sum_with_pred2_deque_dict.items():
-
-                            last_value = value[-1]
-
-                            if idx < n_predator1: # predator1 agents with predator2
-                                metrics[f"predator1/Sum_intake_diff_predator2_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1 # predator2 agents with predator2
-                                metrics[f"predator2/Sum_intake_diff_predator2_P2_{pred2_idx}"] = last_value
-
-                        # team1? view? ??? ??? intake? ??? ????? ??? ???? ??
-                        for idx, value in madqn.intake_inner_with_pred1_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
-
-                            if idx < n_predator1: # predator1 agents with predator1
-                                metrics[f"predator1/inner_intake_diff_predator1_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1 # predator2 agents with predator1
-                                metrics[f"predator2/inner_intake_diff_predator1_P2_{pred2_idx}"] = last_value
-
-                        # team2? view? ??? ??? intake? ??? ????? ??? ???? ??
-                        for idx, value in madqn.intake_inner_with_pred2_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
-
-                            if idx < n_predator1: # predator1 agents with predator2
-                                metrics[f"predator1/inner_intake_diff_predator2_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1 # predator2 agents with predator2
-                                metrics[f"predator2/inner_intake_diff_predator2_P2_{pred2_idx}"] = last_value
-
-                        # ?? ?? ??? view ? ???? ?? ?? outtake ??? ???
-                        for idx, value in madqn.l2_outtake_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
-
-                            if idx < n_predator1:
-                                metrics[f"predator1/total_outtake_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1
-                                metrics[f"predator2/total_outtake_P2_{pred2_idx}"] = last_value
-
-                        # ?? ?? ??? view ? ???? ?? ?? intake ??? ???
-                        for idx, value in madqn.l2_intake_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
-
-                            if idx < n_predator1:
-                                metrics[f"predator1/total_intake_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1
-                                metrics[f"predator2/total_intake_P2_{pred2_idx}"] = last_value
-
-                        # ?  ????? action
-                        for idx, dq in madqn.agent_action_deque_dict.items():
-                            if len(dq) == 0:
+                            if not (
+                                len(observations_dict[idx]) >= 2
+                                and len(book_dict[idx]) >= 2
+                                and len(action_dict[idx]) >= 2
+                                and len(termination_dict[idx]) >= 2
+                                and len(truncation_dict[idx]) >= 2
+                            ):
                                 continue
-                            last_value = dq[-1]
 
-                            if idx < n_predator1:
-                                metrics[f"predator1/action_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1
-                                metrics[f"predator2/action_P2_{pred2_idx}"] = last_value
+                            madqn.buffer.put(
+                                observations_dict[idx][-2],
+                                book_dict[idx][-2],
+                                action_dict[idx][-2],
+                                transition_rewards_total,
+                                observations_dict[idx][-1],
+                                book_dict[idx][-1],
+                                termination_dict[idx][-2],
+                                truncation_dict[idx][-2],
+                            )
 
+                    metrics = {
+                        "steps/total_step_reward": step_rewards_total,
+                        "predator1/step_reward": step_rewards_pred1,
+                        "predator2/step_reward": step_rewards_pred2,
+                        "steps/total_step_reward_np": step_reward_pred1 + step_reward_pred2,
+                        "predator1/step_reward_np": step_reward_pred1,
+                        "predator2/step_reward_np": step_reward_pred2,
+                        "predator1/avg_tag_count": madqn.avg_tag_deque_pred1[-1],
+                        "predator2/avg_tag_count": madqn.avg_tag_deque_pred2[-1],
+                        "predator1/avg_move_count": madqn.avg_move_deque_pred1[-1],
+                        "predator2/avg_move_count": madqn.avg_move_deque_pred2[-1],
+                    }
 
-                        #########################
-                        #######Y?? ?? ??######
-                        #########################
+                    for idx, value in madqn.agent_graph_overlap_pred1_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
-                        # ?? ??? ??? ??? ??? ???? ?? ??? ??? ???, ??? ??? ?? ????? ??? ?? '??? ?'? ???? ?
-                        # team1 ? ??? ?? ?
-                        for idx, value in madqn.tiles_number_with_pred1_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
+                        if idx < n_predator1: # predator1 agents with predator1
+                            metrics[f"predator1/Overlap_ratio_predator1_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1 # predator2 agents with predator1
+                            metrics[f"predator2/Overlap_ratio_predator1_P2_{pred2_idx}"] = last_value
 
-                            if idx < n_predator1:
-                                metrics[f"predator1/n_overlapping_tiles_predator1_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1
-                                metrics[f"predator2/n_overlapping_tiles_predator1_P2_{pred2_idx}"] = last_value
+                    for idx, value in madqn.agent_graph_overlap_pred2_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
+                        if idx < n_predator1: # predator1 agents with predator2
+                            metrics[f"predator1/Overlap_ratio_predator2_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1 # predator2 agents with predator2
+                            metrics[f"predator2/Overlap_ratio_predator2_P2_{pred2_idx}"] = last_value
 
-                        # team2 ? ??? ?? ?
-                        for idx, value in madqn.tiles_number_with_pred2_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
+                    for idx, value in madqn.intake_sum_with_pred1_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
-                            if idx < n_predator1:
-                                metrics[f"predator1/n_overlapping_tiles_predator2_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1
-                                metrics[f"predator2/n_overlapping_tiles_predator2_P2_{pred2_idx}"] = last_value
+                        if idx < n_predator1: # predator1 agents with predator1
+                            metrics[f"predator1/Sum_intake_diff_predator1_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1 # predator2 agents with predator1
+                            metrics[f"predator2/Sum_intake_diff_predator1_P2_{pred2_idx}"] = last_value
 
-                        # prey??? ?? ??
-                        for idx, value in madqn.agent_avg_dist_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
+                    for idx, value in madqn.intake_sum_with_pred2_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
-                            if idx < n_predator1:
-                                metrics[f"predator1/avg_distance_prey_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1
-                                metrics[f"predator2/avg_distance_prey_P2_{pred2_idx}"] = last_value
+                        if idx < n_predator1: # predator1 agents with predator2
+                            metrics[f"predator1/Sum_intake_diff_predator2_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1 # predator2 agents with predator2
+                            metrics[f"predator2/Sum_intake_diff_predator2_P2_{pred2_idx}"] = last_value
 
-                        # prey??? ?? ??
-                        for idx, value in madqn.agent_min_dist_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
+                    for idx, value in madqn.intake_inner_with_pred1_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
-                            if idx < n_predator1:
-                                metrics[f"predator1/shortest_distance_prey_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1
-                                metrics[f"predator2/shortest_distance_prey_P2_{pred2_idx}"] = last_value
+                        if idx < n_predator1: # predator1 agents with predator1
+                            metrics[f"predator1/inner_intake_diff_predator1_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1 # predator2 agents with predator1
+                            metrics[f"predator2/inner_intake_diff_predator1_P2_{pred2_idx}"] = last_value
 
-                        # ?  ???? ?? ???? prey ?
-                        for idx, value in madqn.prey_number_deque_dict.items():
-                            # ? deque? ??? ?? ??
-                            last_value = value[-1]
+                    for idx, value in madqn.intake_inner_with_pred2_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
-                            if idx < n_predator1:
-                                metrics[f"predator1/n_prey_observation_P1_{idx}"] = last_value
-                            else:
-                                pred2_idx = idx - n_predator1
-                                metrics[f"predator2/n_prey_observation_P2_{pred2_idx}"] = last_value
+                        if idx < n_predator1: # predator1 agents with predator2
+                            metrics[f"predator1/inner_intake_diff_predator2_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1 # predator2 agents with predator2
+                            metrics[f"predator2/inner_intake_diff_predator2_P2_{pred2_idx}"] = last_value
 
-                        def _team_mean(d, start, end):
-                            vals = []
-                            for i in range(start, end):
-                                dq = d.get(i, [])
-                                if len(dq) > 0:
-                                    vals.append(dq[-1])
-                            return float(np.mean(vals)) if len(vals) > 0 else float('nan')
+                    for idx, value in madqn.l2_outtake_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
-                        n1 = n_predator1
-                        n2 = n_predator1 + n_predator2
+                        if idx < n_predator1:
+                            metrics[f"predator1/total_outtake_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1
+                            metrics[f"predator2/total_outtake_P2_{pred2_idx}"] = last_value
 
-                        team_metrics = {
-                            "steps/predator1_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, 0, n1),
-                            "steps/predator2_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, n1, n2),
+                    for idx, value in madqn.l2_intake_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
-                            "steps/predator1_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, 0, n1),
-                            "steps/predator2_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, n1, n2),
-                            "steps/predator1_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, 0, n1),
-                            "steps/predator2_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, n1, n2),
+                        if idx < n_predator1:
+                            metrics[f"predator1/total_intake_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1
+                            metrics[f"predator2/total_intake_P2_{pred2_idx}"] = last_value
 
-                            "steps/predator1_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, 0, n1),
-                            "steps/predator2_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, n1, n2),
-                            "steps/predator1_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, 0, n1),
-                            "steps/predator2_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, n1, n2),
+                    for idx, dq in madqn.agent_action_deque_dict.items():
+                        if len(dq) == 0:
+                            continue
+                        last_value = dq[-1]
 
-                            "steps/predator1_mean_outtake_ratio": _team_mean(madqn.outtake_ratio_deque_dict, 0, n1),
-                            "steps/predator2_mean_outtake_ratio": _team_mean(madqn.outtake_ratio_deque_dict, n1, n2),
-                            "steps/predator1_gate_mean": _team_mean(madqn.gate_mean_deque_dict, 0, n1),
-                            "steps/predator2_gate_mean": _team_mean(madqn.gate_mean_deque_dict, n1, n2),
+                        if idx < n_predator1:
+                            metrics[f"predator1/action_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1
+                            metrics[f"predator2/action_P2_{pred2_idx}"] = last_value
 
-                            "steps/predator1_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, 0, n1),
-                            "steps/predator2_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
-                            "steps/predator1_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
-                            "steps/predator2_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
+                    for idx, value in madqn.tiles_number_with_pred1_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
 
-                            "steps/predator1_mean_action": _team_mean(madqn.agent_action_deque_dict, 0, n1),
-                            "steps/predator2_mean_action": _team_mean(madqn.agent_action_deque_dict, n1, n2),
-                        }
+                        if idx < n_predator1:
+                            metrics[f"predator1/n_overlapping_tiles_predator1_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1
+                            metrics[f"predator2/n_overlapping_tiles_predator1_P2_{pred2_idx}"] = last_value
 
-                        metrics["steps/step"] = step_idx_ep
-                        metrics.update(team_metrics)
-                        wandb.log(metrics)
+                    for idx, value in madqn.tiles_number_with_pred2_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
+
+                        if idx < n_predator1:
+                            metrics[f"predator1/n_overlapping_tiles_predator2_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1
+                            metrics[f"predator2/n_overlapping_tiles_predator2_P2_{pred2_idx}"] = last_value
+
+                    for idx, value in madqn.agent_avg_dist_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
+
+                        if idx < n_predator1:
+                            metrics[f"predator1/avg_distance_prey_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1
+                            metrics[f"predator2/avg_distance_prey_P2_{pred2_idx}"] = last_value
+
+                    for idx, value in madqn.agent_min_dist_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
+
+                        if idx < n_predator1:
+                            metrics[f"predator1/shortest_distance_prey_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1
+                            metrics[f"predator2/shortest_distance_prey_P2_{pred2_idx}"] = last_value
+
+                    for idx, value in madqn.prey_number_deque_dict.items():
+                        if len(value) == 0:
+                            continue
+                        last_value = value[-1]
+
+                        if idx < n_predator1:
+                            metrics[f"predator1/n_prey_observation_P1_{idx}"] = last_value
+                        else:
+                            pred2_idx = idx - n_predator1
+                            metrics[f"predator2/n_prey_observation_P2_{pred2_idx}"] = last_value
+
+                    def _team_mean(d, start, end):
+                        vals = []
+                        for i in range(start, end):
+                            dq = d.get(i, [])
+                            if len(dq) > 0:
+                                vals.append(dq[-1])
+                        return float(np.mean(vals)) if len(vals) > 0 else float('nan')
+
+                    n1 = n_predator1
+                    n2 = n_predator1 + n_predator2
+
+                    team_metrics = {
+                        "steps/predator1_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, 0, n1),
+                        "steps/predator2_mean_avg_distance_prey": _team_mean(madqn.agent_avg_dist_deque_dict, n1, n2),
+                        "steps/predator1_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, 0, n1),
+                        "steps/predator2_mean_shortest_distance_prey": _team_mean(madqn.agent_min_dist_deque_dict, n1, n2),
+                        "steps/predator1_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, 0, n1),
+                        "steps/predator2_mean_n_prey_observation": _team_mean(madqn.prey_number_deque_dict, n1, n2),
+                        "steps/predator1_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, 0, n1),
+                        "steps/predator2_mean_total_outtake": _team_mean(madqn.l2_outtake_deque_dict, n1, n2),
+                        "steps/predator1_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, 0, n1),
+                        "steps/predator2_mean_total_intake": _team_mean(madqn.l2_intake_deque_dict, n1, n2),
+                        "steps/predator1_mean_outtake_ratio": _team_mean(madqn.outtake_ratio_deque_dict, 0, n1),
+                        "steps/predator2_mean_outtake_ratio": _team_mean(madqn.outtake_ratio_deque_dict, n1, n2),
+                        "steps/predator1_gate_mean": _team_mean(madqn.gate_mean_deque_dict, 0, n1),
+                        "steps/predator2_gate_mean": _team_mean(madqn.gate_mean_deque_dict, n1, n2),
+                        "steps/predator1_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, 0, n1),
+                        "steps/predator2_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
+                        "steps/predator1_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
+                        "steps/predator2_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
+                        "steps/predator1_mean_action": _team_mean(madqn.agent_action_deque_dict, 0, n1),
+                        "steps/predator2_mean_action": _team_mean(madqn.agent_action_deque_dict, n1, n2),
+                    }
+
+                    metrics["steps/step"] = int(prev_step)
+                    metrics.update(team_metrics)
+                    wandb.log(metrics)
 
 
             if agent[:8] == "predator":
@@ -610,7 +601,6 @@ def main():
                 handles = env.env.env.env.env.get_handles()
                 pos_predator1 = env.env.env.env.env.get_pos(handles[0])
                 pos_predator2 = env.env.env.env.env.get_pos(handles[1])
-                entire_pos_list = np.concatenate((pos_predator1, pos_predator2))
 
                 observation, reward, termination, truncation, info = env.last()
 
@@ -699,7 +689,7 @@ def main():
                     madqn.l2_intake_deque_dict[idx].append(_to_float(l2_intake))
 
                     # move
-                    if action in [1, 2, 3, 4]: 
+                    if action in [0, 1, 3, 4]: 
                         # predator1
                         if idx < n_predator1:
                             move_penalty_dict[idx].append(args.move_penalty)
@@ -736,7 +726,6 @@ def main():
                     termination_dict[idx].append(termination)
                     truncation_dict[idx].append(truncation)
                     agent_pos[idx].append(pos)
-                    entire_pos.append(entire_pos_list)
 
                 if madqn.buffer.size() >= args.trainstart_buffersize:
                     madqn.replay()
@@ -762,13 +751,31 @@ def main():
 
                 completed_step_idx = n_iteration // n_agents
 
+                # Store predator positions once per completed step (avoid per-agent duplicates)
+                handles = env.env.env.env.env.get_handles()
+                pos_predator1 = env.env.env.env.env.get_pos(handles[0])
+                pos_predator2 = env.env.env.env.env.get_pos(handles[1])
+                entire_pos_list = np.concatenate((pos_predator1, pos_predator2))
+                entire_pos.append(entire_pos_list)
+
                 if completed_step_idx == 1:
-                    for idx in range(n_predator1 + n_predator2):
-                        madqn.intake_overlap_with_pred1[idx].append(0)
-                        madqn.intake_overlap_with_pred2[idx].append(0)
+                    if len(entire_pos) >= 2:
+                        past = entire_pos[-2]
+                        now = entire_pos[-1]
+                        ratio_matrix = madqn.calculate_Overlap_ratio_intake(past, now)
+
+                        for idx, value in enumerate(ratio_matrix[:, 0]):
+                            madqn.intake_overlap_with_pred1[idx].append(value)
+
+                        for idx, value in enumerate(ratio_matrix[:, 1]):
+                            madqn.intake_overlap_with_pred2[idx].append(value)
+                    else:
+                        for idx in range(n_predator1 + n_predator2):
+                            madqn.intake_overlap_with_pred1[idx].append(0)
+                            madqn.intake_overlap_with_pred2[idx].append(0)
 
 
-                elif completed_step_idx != args.max_update_steps:
+                elif completed_step_idx != args.max_update_steps and len(entire_pos) >= 2:
                     past = entire_pos[-2]  # s_t-1
                     now = entire_pos[-1]  # s_t
 

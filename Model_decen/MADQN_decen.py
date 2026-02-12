@@ -1,9 +1,10 @@
-from model_decen import G_DQN_1,G_DQN_2, ReplayBuffer
+from model_decen import G_DQN_1, G_DQN_2, ReplayBuffer
 import numpy as np
 import random
 import torch
 import torch.nn as nn
 from torch.optim import Adam
+from collections import deque
 from typing import Optional
 
 
@@ -98,7 +99,7 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
 
         # shapes
         self.shared_shape = (args.map_size + (self.predator1_view_range-2)*2,
-                             args.map_size + (self.predator1_view_range-2)*2, 3)
+                             args.map_size + (self.predator1_view_range-2)*2, 4)
         self.predator1_obs = predator1_obs
         self.predator2_obs = predator2_obs
 
@@ -110,6 +111,10 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         predator2_adj = king_adj(self.predator2_view_range*2)
         self.predator1_adj = torch.tensor(predator1_adj).float()
         self.predator2_adj = torch.tensor(predator2_adj).float()
+
+        self.agent_action_deque_dict = {}  # 각 에이전트가 avg에 따라 액션(움직임,가만히있음,태그)을 어떻게 하는지 저장하기 위한 딕셔너리
+        for agent_idx in range(n_predator1 + n_predator2):
+            self.agent_action_deque_dict[agent_idx] = deque(maxlen=args.deque_len)
 
         # networks
         self.gdqns = [G_DQN_1(self.dim_act, self.predator1_obs, args).to(self.device) for _ in range(self.n_predator1)] + [
@@ -133,6 +138,54 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         self.target_optimizer = None
 
         self.buffer = None
+
+        self.team_idx = 0
+        self.ep_move_count_pred = {0: 0, 1: 0}
+        self.step_move_count_pred = {0: 0, 1: 0}
+        self.step_tag_count_pred = {0: 0, 1: 0}
+
+        dq_len = int(getattr(args, "deque_len", 400)) if args is not None else 400
+        self.avg_move_deque_pred1 = deque(maxlen=dq_len)
+        self.avg_move_deque_pred2 = deque(maxlen=dq_len)
+        self.avg_tag_deque_pred1 = deque(maxlen=dq_len)
+        self.avg_tag_deque_pred2 = deque(maxlen=dq_len)
+
+
+    def set_team_idx(self, idx: int):
+        self.team_idx = int(idx)
+
+    def ep_move_count(self):
+        self.ep_move_count_pred[self.team_idx] += 1
+
+    def reset_ep_move_count(self):
+        self.ep_move_count_pred[0] = 0
+        self.ep_move_count_pred[1] = 0
+
+    def step_move_count(self):
+        self.step_move_count_pred[self.team_idx] += 1
+
+    def reset_step_move_count(self):
+        self.step_move_count_pred[0] = 0
+        self.step_move_count_pred[1] = 0
+
+    def step_tag_count(self):
+        self.step_tag_count_pred[self.team_idx] += 1
+
+    def reset_step_tag_count(self):
+        self.step_tag_count_pred[0] = 0
+        self.step_tag_count_pred[1] = 0
+
+    def avg_move_append_pred1(self, move: float):
+        self.avg_move_deque_pred1.append(float(move))
+
+    def avg_move_append_pred2(self, move: float):
+        self.avg_move_deque_pred2.append(float(move))
+
+    def avg_tag_append_pred1(self, tag: float):
+        self.avg_tag_deque_pred1.append(float(tag))
+
+    def avg_tag_append_pred2(self, tag: float):
+        self.avg_tag_deque_pred2.append(float(tag))
 
 
     def target_update(self, idx: Optional[int] = None):
@@ -159,6 +212,9 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         self.gdqn_optimizer = self.gdqn_optimizers[self.idx]
         self.buffer = self.buffers[self.idx]
 
+    def set_agent_model(self,agent):
+        self.gdqn = self.gdqns[agent]
+        self.gdqn_target = self.gdqn_targets[agent]
 
     def set_agent_buffer(self ,idx):
         self.buffer = self.buffers[idx]
