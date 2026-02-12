@@ -602,7 +602,7 @@ def main():
                 pos_predator1 = env.env.env.env.env.get_pos(handles[0])
                 pos_predator2 = env.env.env.env.env.get_pos(handles[1])
 
-                observation, reward, termination, truncation, info = env.last()
+                observation, reward, termination, truncation, _ = env.last()
 
                 # for predator 1
                 if agent[9] == "1": # predator predator1_0, predator1_1 .. etc
@@ -839,9 +839,9 @@ def main():
                 os.makedirs(os.path.dirname(path_t), exist_ok=True)
                 th.save(madqn.gdqn_targets[i].state_dict(), path_t)
 
-        print('*' * 10, 'train over', '*' * 10)
-
     env.close()
+
+    print('*' * 10, 'train over', '*' * 10)
 
 if __name__ == '__main__':
     main()

@@ -1,4 +1,3 @@
-# parse args locally so this script can be run standalone
 from magent2_backup.environments import hetero_adversarial_v1
 from MADQN_decen import MADQN
 import argparse
@@ -263,7 +262,7 @@ def main():
                     wandb.log(metrics)
 
             if agent[:8] == "predator":
-                observation, reward, termination, truncation, info = last(env)
+                observation, reward, termination, truncation, _ = last(env)
 
                 if agent[9] == "1":
                     idx = int(agent[11:])
