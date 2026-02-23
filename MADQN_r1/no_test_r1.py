@@ -59,7 +59,7 @@ def get_args():
 
 args = get_args()
 wandb.init(project="madqn_test", entity='hails',config=args.__dict__)
-wandb.run.name = 'lamda_0_tau_0.0'
+wandb.run.name = 'lamda_0_info_only_onstay'
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -256,7 +256,9 @@ def main():
                                 else:
                                     madqn.set_agent_shared(predator2_view_range)
 
-                                madqn.to_guestbook(shared_info_dict[idx][-1].to('cpu')) # append last iteration info
+                                
+                                if len(action_dict[idx]) > 0 and action_dict[idx][-1] == 2:
+                                    madqn.to_guestbook(shared_info_dict[idx][-1].to('cpu'))
 
                         else:
                             # erase last step book information
@@ -269,8 +271,9 @@ def main():
                                     madqn.set_agent_shared(predator2_view_range)
 
                                 # self.to_guestbook(shared_info.to('cpu'))
-                                madqn.to_guestbook(-(args.book_decay ** (args.book_term)) * shared_info_dict[idx][
-                                    -(args.book_term + 1)].to('cpu'))
+                                # remove only if that past step actually wrote into the guestbook (action==2)
+                                if (len(action_dict[idx]) >= (args.book_term + 1) and action_dict[idx][-(args.book_term + 1)] == 2):
+                                    madqn.to_guestbook(-(args.book_decay ** (args.book_term)) * shared_info_dict[idx][-(args.book_term + 1)].to('cpu'))
 
                             # Add recent Step information
                             for idx in range(n_predator1 + n_predator2):
@@ -281,7 +284,9 @@ def main():
                                 else:
                                     madqn.set_agent_shared(predator2_view_range)
 
-                                madqn.to_guestbook(shared_info_dict[idx][-1].to('cpu')) # append last iteration info
+                                # add recent step info only when the agent took action==2
+                                if len(action_dict[idx]) > 0 and action_dict[idx][-1] == 2:
+                                    madqn.to_guestbook(shared_info_dict[idx][-1].to('cpu'))
 
 
                     madqn.avg_dist_append_pred1(check_zero_size_avg_pred1(madqn.summation_team_dist[0]))  # step
@@ -294,7 +299,7 @@ def main():
                     madqn.avg_move_append_pred2((madqn.step_move_count_pred[1]) / n_predator2)  # step
                     madqn.avg_tag_append_pred2((madqn.step_tag_count_pred[1]) / n_predator2)  # step
 
-                    # action ratio [agent][type]
+                    # action-type ratios for the previous completed step
                     predator1_total = step_action_type_count[0][0] + step_action_type_count[0][1] + step_action_type_count[0][2]
                     predator2_total = step_action_type_count[1][0] + step_action_type_count[1][1] + step_action_type_count[1][2]
                     all_total = predator1_total + predator2_total
@@ -764,6 +769,10 @@ def main():
 
                     book_cpu = book.detach().cpu()
                     shared_info_cpu = shared_info.detach().cpu()
+
+                    # # If the agent chose to stay (action == 2), append its shared info to the guestbook
+                    # if action == 2:
+                    #     madqn.to_guestbook(shared_info_cpu)
 
                     book_dict[idx].append(book_cpu)
                     shared_info_dict[idx].append(shared_info_cpu)

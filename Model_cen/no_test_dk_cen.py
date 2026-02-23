@@ -1,3 +1,6 @@
+import os
+import sys
+
 from magent2_backup.environments import hetero_adversarial_v1
 from MADQN_cen import MADQN
 import argparse
@@ -5,7 +8,7 @@ import torch as th
 import wandb
 import tqdm
 import numpy as np
-import os
+from collections import deque
 
 def last(values, k=1, default=0.0):
     try:
