@@ -547,22 +547,34 @@ def main():
                             continue
                         last_value = value[-1]
 
+                        agent_view_range = predator1_view_range if idx < n_predator1 else predator2_view_range
+                        total_tiles = float((agent_view_range * 2) ** 2)
+                        last_ratio = float(last_value) / total_tiles if total_tiles > 0 else 0.0
+
                         if idx < n_predator1:
                             metrics[f"predator1/n_overlapping_tiles_predator1_P1_{idx}"] = last_value
+                            metrics[f"predator1/overlap_tiles_ratio_predator1_P1_{idx}"] = last_ratio
                         else:
                             pred2_idx = idx - n_predator1
                             metrics[f"predator2/n_overlapping_tiles_predator1_P2_{pred2_idx}"] = last_value
+                            metrics[f"predator2/overlap_tiles_ratio_predator1_P2_{pred2_idx}"] = last_ratio
 
                     for idx, value in madqn.tiles_number_with_pred2_deque_dict.items():
                         if len(value) == 0:
                             continue
                         last_value = value[-1]
 
+                        agent_view_range = predator1_view_range if idx < n_predator1 else predator2_view_range
+                        total_tiles = float((agent_view_range * 2) ** 2)
+                        last_ratio = float(last_value) / total_tiles if total_tiles > 0 else 0.0
+
                         if idx < n_predator1:
                             metrics[f"predator1/n_overlapping_tiles_predator2_P1_{idx}"] = last_value
+                            metrics[f"predator1/overlap_tiles_ratio_predator2_P1_{idx}"] = last_ratio
                         else:
                             pred2_idx = idx - n_predator1
                             metrics[f"predator2/n_overlapping_tiles_predator2_P2_{pred2_idx}"] = last_value
+                            metrics[f"predator2/overlap_tiles_ratio_predator2_P2_{pred2_idx}"] = last_ratio
 
                     for idx, value in madqn.agent_avg_dist_deque_dict.items():
                         if len(value) == 0:
@@ -605,6 +617,17 @@ def main():
                                 vals.append(dq[-1])
                         return float(np.mean(vals)) if len(vals) > 0 else float('nan')
 
+                    def _team_mean_tiles_ratio(d, start, end):
+                        vals = []
+                        for i in range(start, end):
+                            dq = d.get(i, [])
+                            if len(dq) == 0:
+                                continue
+                            agent_view_range = predator1_view_range if i < n_predator1 else predator2_view_range
+                            total_tiles = float((agent_view_range * 2) ** 2)
+                            vals.append(float(dq[-1]) / total_tiles if total_tiles > 0 else 0.0)
+                        return float(np.mean(vals)) if len(vals) > 0 else float('nan')
+
                     n1 = n_predator1
                     n2 = n_predator1 + n_predator2
 
@@ -627,6 +650,10 @@ def main():
                         "steps/predator2_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
                         "steps/predator1_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
                         "steps/predator2_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
+                        "steps/predator1_mean_overlap_tiles_ratio_pred1": _team_mean_tiles_ratio(madqn.tiles_number_with_pred1_deque_dict, 0, n1),
+                        "steps/predator2_mean_overlap_tiles_ratio_pred1": _team_mean_tiles_ratio(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
+                        "steps/predator1_mean_overlap_tiles_ratio_pred2": _team_mean_tiles_ratio(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
+                        "steps/predator2_mean_overlap_tiles_ratio_pred2": _team_mean_tiles_ratio(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
                         "steps/predator1_mean_action": _team_mean(madqn.agent_action_deque_dict, 0, n1),
                         "steps/predator2_mean_action": _team_mean(madqn.agent_action_deque_dict, n1, n2),
                     }

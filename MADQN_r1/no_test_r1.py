@@ -49,9 +49,9 @@ def get_args():
     parser.add_argument('--n_predator1', type=int, default=9)
     parser.add_argument('--n_predator2', type=int, default=9)
     parser.add_argument('--n_prey', type=int, default=36)
-    parser.add_argument('--tag_reward', type=float, default=3)
-    parser.add_argument('--tag_penalty', type=float, default=-0.2)
-    parser.add_argument('--move_penalty', type=float, default=-0.15)
+    parser.add_argument('--tag_reward', type=float, default=3) # 3
+    parser.add_argument('--tag_penalty', type=float, default=-0.2) # -0.2
+    parser.add_argument('--move_penalty', type=float, default=-0.15) # -0.15
 
     parser.add_argument('--seed', type=int, default=125)
 
@@ -59,7 +59,7 @@ def get_args():
 
 args = get_args()
 wandb.init(project="madqn_test", entity='hails',config=args.__dict__)
-wandb.run.name = 'lamda_0_info_only_onstay'
+wandb.run.name = 'R1_lamda_0_default'
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -547,27 +547,41 @@ def main():
                             pred2_idx = idx - n_predator1
                             metrics[f"predator2/action_P2_{pred2_idx}"] = last_value
 
-                    for idx, value in madqn.tiles_number_with_pred1_deque_dict.items():
+                    for idx, value in madqn.tiles_number_with_pred1_deque_dict.items(): # overlapping tiles + ratio
                         if len(value) == 0:
                             continue
                         last_value = value[-1]
 
+                        # normalize by self view-area tiles (per-agent ratio in [0,1])
+                        agent_view_range = predator1_view_range if idx < n_predator1 else predator2_view_range
+                        total_tiles = float((agent_view_range * 2) ** 2)
+                        last_ratio = float(last_value) / total_tiles if total_tiles > 0 else 0.0
+
                         if idx < n_predator1:
                             metrics[f"predator1/n_overlapping_tiles_predator1_P1_{idx}"] = last_value
+                            metrics[f"predator1/overlap_tiles_ratio_predator1_P1_{idx}"] = last_ratio
                         else:
                             pred2_idx = idx - n_predator1
                             metrics[f"predator2/n_overlapping_tiles_predator1_P2_{pred2_idx}"] = last_value
+                            metrics[f"predator2/overlap_tiles_ratio_predator1_P2_{pred2_idx}"] = last_ratio
 
                     for idx, value in madqn.tiles_number_with_pred2_deque_dict.items():
                         if len(value) == 0:
                             continue
                         last_value = value[-1]
 
+                        # normalize by self view-area tiles (per-agent ratio in [0,1])
+                        agent_view_range = predator1_view_range if idx < n_predator1 else predator2_view_range
+                        total_tiles = float((agent_view_range * 2) ** 2)
+                        last_ratio = float(last_value) / total_tiles if total_tiles > 0 else 0.0
+
                         if idx < n_predator1:
                             metrics[f"predator1/n_overlapping_tiles_predator2_P1_{idx}"] = last_value
+                            metrics[f"predator1/overlap_tiles_ratio_predator2_P1_{idx}"] = last_ratio
                         else:
                             pred2_idx = idx - n_predator1
                             metrics[f"predator2/n_overlapping_tiles_predator2_P2_{pred2_idx}"] = last_value
+                            metrics[f"predator2/overlap_tiles_ratio_predator2_P2_{pred2_idx}"] = last_ratio
 
                     for idx, value in madqn.agent_avg_dist_deque_dict.items():
                         if len(value) == 0:
@@ -610,6 +624,17 @@ def main():
                                 vals.append(dq[-1])
                         return float(np.mean(vals)) if len(vals) > 0 else float('nan')
 
+                    def _team_mean_tiles_ratio(d, start, end):
+                        vals = []
+                        for i in range(start, end):
+                            dq = d.get(i, [])
+                            if len(dq) == 0:
+                                continue
+                            agent_view_range = predator1_view_range if i < n_predator1 else predator2_view_range
+                            total_tiles = float((agent_view_range * 2) ** 2)
+                            vals.append(float(dq[-1]) / total_tiles if total_tiles > 0 else 0.0)
+                        return float(np.mean(vals)) if len(vals) > 0 else float('nan')
+
                     n1 = n_predator1
                     n2 = n_predator1 + n_predator2
 
@@ -632,6 +657,10 @@ def main():
                         "steps/predator2_mean_overlap_tiles_pred1": _team_mean(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
                         "steps/predator1_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
                         "steps/predator2_mean_overlap_tiles_pred2": _team_mean(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
+                        "steps/predator1_mean_overlap_tiles_ratio_pred1": _team_mean_tiles_ratio(madqn.tiles_number_with_pred1_deque_dict, 0, n1),
+                        "steps/predator2_mean_overlap_tiles_ratio_pred1": _team_mean_tiles_ratio(madqn.tiles_number_with_pred1_deque_dict, n1, n2),
+                        "steps/predator1_mean_overlap_tiles_ratio_pred2": _team_mean_tiles_ratio(madqn.tiles_number_with_pred2_deque_dict, 0, n1),
+                        "steps/predator2_mean_overlap_tiles_ratio_pred2": _team_mean_tiles_ratio(madqn.tiles_number_with_pred2_deque_dict, n1, n2),
                         "steps/predator1_mean_action": _team_mean(madqn.agent_action_deque_dict, 0, n1),
                         "steps/predator2_mean_action": _team_mean(madqn.agent_action_deque_dict, n1, n2),
                     }
@@ -770,10 +799,6 @@ def main():
                     book_cpu = book.detach().cpu()
                     shared_info_cpu = shared_info.detach().cpu()
 
-                    # # If the agent chose to stay (action == 2), append its shared info to the guestbook
-                    # if action == 2:
-                    #     madqn.to_guestbook(shared_info_cpu)
-
                     book_dict[idx].append(book_cpu)
                     shared_info_dict[idx].append(shared_info_cpu)
                     termination_dict[idx].append(termination)
@@ -804,7 +829,6 @@ def main():
 
                 completed_step_idx = n_iteration // n_agents
 
-                # Store predator positions once per completed step (avoid per-agent duplicates)
                 handles = env.env.env.env.env.get_handles()
                 pos_predator1 = env.env.env.env.env.get_pos(handles[0])
                 pos_predator2 = env.env.env.env.env.get_pos(handles[1])

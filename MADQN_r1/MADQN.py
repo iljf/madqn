@@ -328,7 +328,7 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         result_matrix = np.zeros((self.n_predator1 + self.n_predator2, 2))
 
         result_matrix[:, 0] = np.sum(overlap_matrix[:, :self.n_predator1], axis=1)  # 첫 3개 정사각형에 대한 합
-        result_matrix[:, 1] = np.sum(overlap_matrix[:, self.n_predator2:], axis=1)  # 나머지 3개 정사각형에 대한 합
+        result_matrix[:, 1] = np.sum(overlap_matrix[:, self.n_predator1:], axis=1)  # predator2 그룹에 대한 합
 
         return result_matrix
 
@@ -357,7 +357,7 @@ class MADQN():  # def __init__(self,  dim_act, observation_state):
         result_matrix = np.zeros((self.n_predator1 + self.n_predator2, 2))
 
         result_matrix[:, 0] = np.sum(overlap_matrix[:, :self.n_predator1], axis=1)  # 첫 3개 정사각형에 대한 합
-        result_matrix[:, 1] = np.sum(overlap_matrix[:, self.n_predator2:], axis=1)  # 나머지 3개 정사각형에 대한 합
+        result_matrix[:, 1] = np.sum(overlap_matrix[:, self.n_predator1:], axis=1)  # predator2 그룹에 대한 합
 
         return result_matrix
 
